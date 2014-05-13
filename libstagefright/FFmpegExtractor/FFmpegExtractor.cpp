@@ -1437,6 +1437,14 @@ static enum AVCodecID getCodecId(AVFormatContext *ic, AVMediaType codec_type)
 	AVCodecContext *avctx = NULL;
 
 	for (idx = 0; idx < ic->nb_streams; idx++) {
+		if (ic->streams[idx]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+			// FFMPEG converts album art to MJPEG, but we don't want to
+			// include that in the parsing as MJPEG is not supported by
+			// Android, which forces the media to be extracted by FFMPEG
+			// while in fact, Android supports it.
+			continue;
+		}
+
 		avctx = ic->streams[idx]->codec;
 		if (avctx->codec_type == codec_type) {
 			return avctx->codec_id;
