@@ -390,6 +390,12 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
     case AV_CODEC_ID_HEVC:
         meta = setHEVCFormat(avctx);
         break;
+    case AV_CODEC_ID_VP8:
+        meta = setVP8Format(avctx);
+        break;
+    case AV_CODEC_ID_VP9:
+        meta = setVP9Format(avctx);
+        break;
     default:
         ALOGD("unsuppoted video codec(id:%d, name:%s), but give it a chance",
                 avctx->codec_id, avcodec_get_name(avctx->codec_id));

@@ -43,6 +43,8 @@ sp<MetaData> setRV30Format(AVCodecContext *avctx);
 sp<MetaData> setRV40Format(AVCodecContext *avctx);
 sp<MetaData> setFLV1Format(AVCodecContext *avctx);
 sp<MetaData> setHEVCFormat(AVCodecContext *avctx);
+sp<MetaData> setVP8Format(AVCodecContext *avctx);
+sp<MetaData> setVP9Format(AVCodecContext *avctx);
 //audio
 sp<MetaData> setMP2Format(AVCodecContext *avctx);
 sp<MetaData> setMP3Format(AVCodecContext *avctx);

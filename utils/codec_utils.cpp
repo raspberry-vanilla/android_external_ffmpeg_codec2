@@ -283,6 +283,26 @@ sp<MetaData> setHEVCFormat(AVCodecContext *avctx)
     return meta;
 }
 
+sp<MetaData> setVP8Format(AVCodecContext *avctx)
+{
+    ALOGV("VP8");
+
+    sp<MetaData> meta = new MetaData;
+    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
+
+    return meta;
+}
+
+sp<MetaData> setVP9Format(AVCodecContext *avctx)
+{
+    ALOGV("VP9");
+
+    sp<MetaData> meta = new MetaData;
+    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
+
+    return meta;
+}
+
 //audio
 
 sp<MetaData> setMP2Format(AVCodecContext *avctx)
