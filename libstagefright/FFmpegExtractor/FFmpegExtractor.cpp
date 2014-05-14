@@ -1425,6 +1425,7 @@ static formatmap FILE_FORMATS[] = {
         {"dts",                     MEDIA_MIMETYPE_CONTAINER_DTS      },
         {"flac",                    MEDIA_MIMETYPE_CONTAINER_FLAC     },
         {"ac3",                     MEDIA_MIMETYPE_AUDIO_AC3          },
+        {"mp3",                     MEDIA_MIMETYPE_AUDIO_MPEG         },
         {"wav",                     MEDIA_MIMETYPE_CONTAINER_WAV      },
         {"ogg",                     MEDIA_MIMETYPE_CONTAINER_OGG      },
         {"vc1",                     MEDIA_MIMETYPE_CONTAINER_VC1      },
