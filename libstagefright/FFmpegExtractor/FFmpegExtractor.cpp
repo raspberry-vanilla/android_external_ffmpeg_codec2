@@ -1489,6 +1489,7 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
     case AV_CODEC_ID_H263I:
     case AV_CODEC_ID_VP6:
     case AV_CODEC_ID_VP8:
+    case AV_CODEC_ID_VP9:
 	//audio
     case AV_CODEC_ID_AAC:
     case AV_CODEC_ID_MP3:
@@ -1609,7 +1610,8 @@ static void adjustMKVConfidence(AVFormatContext *ic, float *confidence)
 			&& codec_id != AV_CODEC_ID_H264
 			&& codec_id != AV_CODEC_ID_MPEG4
 			&& codec_id != AV_CODEC_ID_VP6
-			&& codec_id != AV_CODEC_ID_VP8) {
+			&& codec_id != AV_CODEC_ID_VP8
+			&& codec_id != AV_CODEC_ID_VP9) {
 		//the MEDIA_MIMETYPE_CONTAINER_MATROSKA of confidence is 0.6f
 		ALOGI("[mkv]video codec(%s), confidence should be larger than MatroskaExtractor",
 				avcodec_get_name(codec_id));
