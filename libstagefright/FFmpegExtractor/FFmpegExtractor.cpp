@@ -57,6 +57,7 @@
 #define DEBUG_DISABLE_AUDIO        0
 #define WAIT_KEY_PACKET_AFTER_SEEK 1
 #define DEBUG_PKT                  0
+#define DEBUG_FORMATS              0
 
 enum {
     NO_SEEK = 0,
@@ -1746,12 +1747,14 @@ static const char *findMatchingContainer(const char *name)
 	size_t i = 0;
 	const char *container = NULL;
 
+#if DEBUG_FORMATS
 	ALOGI("list the formats suppoted by ffmpeg: ");
 	ALOGI("========================================");
 	for (i = 0; i < NELEM(FILE_FORMATS); ++i) {
 		ALOGV("format_names[%02d]: %s", i, FILE_FORMATS[i].format);
 	}
 	ALOGI("========================================");
+#endif
 
 	for (i = 0; i < NELEM(FILE_FORMATS); ++i) {
 		int len = strlen(FILE_FORMATS[i].format);
