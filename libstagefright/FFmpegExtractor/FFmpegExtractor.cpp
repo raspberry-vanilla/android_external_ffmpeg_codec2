@@ -1767,7 +1767,7 @@ static const char *findMatchingContainer(const char *name)
 	return container;
 }
 
-static const char *SniffFFMPEGCommon(const char *url, float *confidence)
+static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fastMPEG4)
 {
 	int err = 0;
 	size_t i = 0;
@@ -1790,6 +1790,13 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence)
 	}
 
 	err = avformat_open_input(&ic, url, NULL, NULL);
+
+        if (ic->iformat != NULL && fastMPEG4 &&
+              !strcasecmp(findMatchingContainer(ic->iformat->name),
+                MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
+            return MEDIA_MIMETYPE_CONTAINER_MPEG4;
+        }
+
 	if (err < 0) {
         ALOGE("%s: avformat_open_input failed, err:%s", url, av_err2str(err));
 		goto fail;
@@ -1841,7 +1848,7 @@ static const char *BetterSniffFFMPEG(const sp<DataSource> &source,
 	// pass the addr of smart pointer("source")
 	snprintf(url, sizeof(url), "android-source:%p", source.get());
 
-	ret = SniffFFMPEGCommon(url, confidence);
+	ret = SniffFFMPEGCommon(url, confidence, (source->flags() & DataSource::kIsCachingDataSource));
 	if (ret) {
 		meta->setString("extended-extractor-url", url);
 	}
@@ -1865,7 +1872,7 @@ static const char *LegacySniffFFMPEG(const sp<DataSource> &source,
 	// pass the addr of smart pointer("source") + file name
 	snprintf(url, sizeof(url), "android-source:%p|file:%s", source.get(), uri.string());
 
-	ret = SniffFFMPEGCommon(url, confidence);
+	ret = SniffFFMPEGCommon(url, confidence, false);
 	if (ret) {
 		meta->setString("extended-extractor-url", url);
 	}
