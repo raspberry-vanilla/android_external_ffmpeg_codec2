@@ -1791,11 +1791,14 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
 
 	err = avformat_open_input(&ic, url, NULL, NULL);
 
-        if (ic->iformat != NULL && fastMPEG4 &&
-              !strcasecmp(findMatchingContainer(ic->iformat->name),
-                MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
-            return MEDIA_MIMETYPE_CONTAINER_MPEG4;
-        }
+	if (ic->iformat != NULL &&
+		!strcasecmp(findMatchingContainer(ic->iformat->name),
+		MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
+		if (fastMPEG4) {
+			container = findMatchingContainer(ic->iformat->name);
+			goto fail;
+		}
+	}
 
 	if (err < 0) {
         ALOGE("%s: avformat_open_input failed, err:%s", url, av_err2str(err));
