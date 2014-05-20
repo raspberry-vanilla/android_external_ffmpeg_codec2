@@ -1791,7 +1791,8 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
 
 	err = avformat_open_input(&ic, url, NULL, NULL);
 
-	if (ic->iformat != NULL &&
+	if (ic->iformat != NULL && ic->iformat->name != NULL &&
+		findMatchingContainer(ic->iformat->name) != NULL &&
 		!strcasecmp(findMatchingContainer(ic->iformat->name),
 		MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
 		if (fastMPEG4) {
