@@ -1791,6 +1791,11 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
 
 	err = avformat_open_input(&ic, url, NULL, NULL);
 
+	if (err < 0) {
+        ALOGE("%s: avformat_open_input failed, err:%s", url, av_err2str(err));
+		goto fail;
+	}
+
 	if (ic->iformat != NULL && ic->iformat->name != NULL &&
 		findMatchingContainer(ic->iformat->name) != NULL &&
 		!strcasecmp(findMatchingContainer(ic->iformat->name),
@@ -1799,11 +1804,6 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
 			container = findMatchingContainer(ic->iformat->name);
 			goto fail;
 		}
-	}
-
-	if (err < 0) {
-        ALOGE("%s: avformat_open_input failed, err:%s", url, av_err2str(err));
-		goto fail;
 	}
 
 	opts = setup_find_stream_info_opts(ic, codec_opts);
