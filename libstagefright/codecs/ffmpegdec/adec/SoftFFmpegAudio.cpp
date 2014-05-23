@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
+#include <media/stagefright/OMXCodec.h>
 
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
@@ -374,11 +375,12 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->bInterleaved = OMX_TRUE;
             profile->nBitPerSample = 16;
             profile->ePCMMode = OMX_AUDIO_PCMModeLinear;
-            profile->eChannelMapping[0] = OMX_AUDIO_ChannelLF;
-            profile->eChannelMapping[1] = OMX_AUDIO_ChannelRF;
+
+            if (getOMXChannelMapping(mAudioSrcChannels, profile->eChannelMapping) != OK) {
+                return OMX_ErrorNone;
+            }
 
             CHECK(isConfigured());
-
             profile->nChannels = mAudioSrcChannels;
             profile->nSamplingRate = mAudioSrcFreq;
 
@@ -691,7 +693,12 @@ void SoftFFmpegAudio::adjustAudioParams() {
     sampling_rate = mCtx->sample_rate;
 
     //channels support 1 or 2 only
-    channels = mCtx->channels >= 2 ? 2 : 1;
+    //channels = mCtx->channels >= 2 ? 2 : 1;
+
+    //let android audio mixer to downmix if there is no multichannel output
+    //and use number of channels from the source file, useful for HDMI output
+
+    channels = mCtx->channels;
 
     //4000 <= sampling rate <= 48000
     if (sampling_rate < 4000) {
