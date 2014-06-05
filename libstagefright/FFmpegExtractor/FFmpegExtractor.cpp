@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
 #define LOG_TAG "FFmpegExtractor"
 #include <utils/Log.h>
 
@@ -57,6 +56,7 @@
 #define DEBUG_DISABLE_AUDIO        0
 #define WAIT_KEY_PACKET_AFTER_SEEK 1
 #define DEBUG_PKT                  0
+#define DEBUG_EXTRADATA            0
 
 enum {
     NO_SEEK = 0,
@@ -572,14 +572,14 @@ int FFmpegExtractor::stream_component_open(int stream_index)
             }
             return ret;
          }
-
+#if DEBUG_EXTRADATA
         if (avctx->extradata) {
             ALOGV("video stream extradata:");
             hexdump(avctx->extradata, avctx->extradata_size);
         } else {
             ALOGV("video stream no extradata, but we can ignore it.");
         }
-
+#endif
         meta = setVideoFormat(mVideoStream);
         if (meta == NULL) {
             ALOGE("setVideoFormat failed");
@@ -610,14 +610,14 @@ int FFmpegExtractor::stream_component_open(int stream_index)
             }
             return ret;
         }
-
+#if DEBUG_EXTRADATA
         if (avctx->extradata) {
             ALOGV("audio stream extradata(%d):", avctx->extradata_size);
             hexdump(avctx->extradata, avctx->extradata_size);
         } else {
             ALOGV("audio stream no extradata, but we can ignore it.");
         }
-
+#endif
         meta = setAudioFormat(mAudioStream);
         if (meta == NULL) {
             ALOGE("setAudioFormat failed");

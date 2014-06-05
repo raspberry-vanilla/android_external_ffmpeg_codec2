@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_NDEBUG 0
 #define LOG_TAG "SoftFFmpegVideo"
 #include <utils/Log.h>
 
@@ -26,6 +25,7 @@
 
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
+#define DEBUG_EXTRADATA 0
 
 static int decoder_reorder_pts = -1;
 
@@ -718,11 +718,11 @@ int32_t SoftFFmpegVideo::handleExtradata() {
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     BufferInfo *inInfo = *inQueue.begin();
     OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
-
+#if DEBUG_EXTRADATA
     ALOGI("got extradata, ignore: %d, size: %lu",
             mIgnoreExtradata, inHeader->nFilledLen);
     hexdump(inHeader->pBuffer + inHeader->nOffset, inHeader->nFilledLen);
-
+#endif
     if (mIgnoreExtradata) {
         ALOGI("got extradata, size: %lu, but ignore it", inHeader->nFilledLen);
 	} else {
@@ -760,8 +760,10 @@ int32_t SoftFFmpegVideo::openDecoder() {
     }
 
     if (!mExtradataReady) {
+#if DEBUG_EXTRADATA
         ALOGI("extradata is ready, size: %d", mCtx->extradata_size);
         hexdump(mCtx->extradata, mCtx->extradata_size);
+#endif
         mExtradataReady = true;
     }
 
