@@ -1442,7 +1442,7 @@ void SoftFFmpegAudio::drainEOSOutputBuffer() {
 	CHECK(outInfo != NULL);
 	OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-	CHECK_EQ(mResampledDataSize, 0);
+	// CHECK_EQ(mResampledDataSize, 0);
 
     ALOGD("ffmpeg audio decoder fill eos outbuf");
 
