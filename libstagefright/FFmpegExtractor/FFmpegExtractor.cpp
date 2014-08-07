@@ -495,7 +495,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
 
         meta->setInt32(kKeyChannelCount, avctx->channels);
         meta->setInt32(kKeyBitRate, avctx->bit_rate);
-        meta->setInt32(kKeyBitspersample, avctx->bits_per_coded_sample);
+        meta->setInt32(kKeySampleBits, avctx->bits_per_coded_sample);
         meta->setInt32(kKeySampleRate, avctx->sample_rate);
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);
@@ -1601,7 +1601,8 @@ static void adjustMPEG2TSConfidence(AVFormatContext *ic, float *confidence)
 	codec_id = getCodecId(ic, AVMEDIA_TYPE_AUDIO);
 	if (codec_id != AV_CODEC_ID_NONE
 			&& codec_id != AV_CODEC_ID_AAC
-			&& codec_id != AV_CODEC_ID_PCM_S16LE //FIXME, AV_CODEC_ID_PCM_S24LE, AV_CODEC_ID_PCM_S32LE?
+			&& codec_id != AV_CODEC_ID_PCM_S16LE
+			&& codec_id != AV_CODEC_ID_PCM_S24LE
 			&& codec_id != AV_CODEC_ID_MP1
 			&& codec_id != AV_CODEC_ID_MP2
 			&& codec_id != AV_CODEC_ID_MP3) {

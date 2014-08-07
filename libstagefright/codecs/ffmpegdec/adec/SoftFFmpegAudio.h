@@ -56,7 +56,7 @@ private:
         kOutputPortIndex  = 1,
         kNumInputBuffers  = 4,
         kNumOutputBuffers = 4,
-        kOutputBufferSize = 4608 * 2
+        kOutputBufferSize = 9216 * 2
     };
 
     enum {
@@ -128,6 +128,8 @@ private:
     int64_t mAudioTgtChannelLayout;
     enum AVSampleFormat mAudioSrcFmt;
     enum AVSampleFormat mAudioTgtFmt;
+
+    bool mHighResAudioEnabled;
 
     enum {
         NONE,

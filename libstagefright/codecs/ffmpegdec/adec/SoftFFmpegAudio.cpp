@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "SoftFFmpegAudio"
 #include <utils/Log.h>
+#include <cutils/properties.h>
 
 #include "SoftFFmpegAudio.h"
 
@@ -92,7 +93,12 @@ SoftFFmpegAudio::SoftFFmpegAudio(
 
     setMode(name);
 
-    ALOGD("SoftFFmpegAudio component: %s mMode: %d", name, mMode);
+    char value[PROPERTY_VALUE_MAX] = {0};
+    property_get("audio.offload.24bit.enable", value, "0");
+    mHighResAudioEnabled = atoi(value);
+
+    ALOGD("SoftFFmpegAudio component: %s mMode: %d mHighResAudioEnabled: %d",
+            name, mMode, mHighResAudioEnabled);
 
     initPorts();
     CHECK_EQ(initDecoder(), (status_t)OK);
@@ -700,16 +706,20 @@ void SoftFFmpegAudio::adjustAudioParams() {
 
     channels = mCtx->channels;
 
-    //4000 <= sampling rate <= 48000
+    int32_t max_rate = mHighResAudioEnabled ? 192000 : 48000;
+
+    //4000 <= sampling rate <= 48000/192000
     if (sampling_rate < 4000) {
         sampling_rate = 4000;
-    } else if (sampling_rate > 48000) {
-        sampling_rate = 48000;
+    } else if (sampling_rate > max_rate) {
+        sampling_rate = max_rate;
     }
 
     mAudioSrcChannels = mAudioTgtChannels = channels;
     mAudioSrcFreq = mAudioTgtFreq = sampling_rate;
-    mAudioSrcFmt = mAudioTgtFmt = AV_SAMPLE_FMT_S16;
+    mAudioSrcFmt = mAudioTgtFmt =
+        (mHighResAudioEnabled && (mCtx->bits_per_coded_sample == 24))
+            ? AV_SAMPLE_FMT_S32 : AV_SAMPLE_FMT_S16;
     mAudioSrcChannelLayout = mAudioTgtChannelLayout =
         av_get_default_channel_layout(channels);
 }
