@@ -693,20 +693,26 @@ OMX_ERRORTYPE SoftFFmpegAudio::isRoleSupported(
 void SoftFFmpegAudio::adjustAudioParams() {
     int32_t channels = 0;
     int32_t sampling_rate = 0;
+    int32_t max_rate = 48000;
+    enum AVSampleFormat sample_fmt = AV_SAMPLE_FMT_S16;
 
     CHECK(!isConfigured());
 
     sampling_rate = mCtx->sample_rate;
 
-    //channels support 1 or 2 only
-    //channels = mCtx->channels >= 2 ? 2 : 1;
-
     //let android audio mixer to downmix if there is no multichannel output
-    //and use number of channels from the source file, useful for HDMI output
-
+    //and use number of channels from the source file, useful for HDMI/offload output
     channels = mCtx->channels;
 
-    int32_t max_rate = mHighResAudioEnabled ? 192000 : 48000;
+    // if highres is available, we can output 24-bit pcm at 192KHz
+    if (mHighResAudioEnabled) {
+        max_rate = 192000;
+        int bits = av_get_bytes_per_sample(mCtx->sample_fmt) * 8;
+        if (bits >= 24) {
+            sample_fmt = AV_SAMPLE_FMT_S32;
+            ALOGD("Enabled high-resolution audio for sample format %d", sample_fmt);
+        }
+    }
 
     //4000 <= sampling rate <= 48000/192000
     if (sampling_rate < 4000) {
@@ -717,9 +723,8 @@ void SoftFFmpegAudio::adjustAudioParams() {
 
     mAudioSrcChannels = mAudioTgtChannels = channels;
     mAudioSrcFreq = mAudioTgtFreq = sampling_rate;
-    mAudioSrcFmt = mAudioTgtFmt =
-        (mHighResAudioEnabled && (mCtx->bits_per_coded_sample == 24))
-            ? AV_SAMPLE_FMT_S32 : AV_SAMPLE_FMT_S16;
+    mAudioSrcFmt = mCtx->sample_fmt;
+    mAudioTgtFmt = sample_fmt;
     mAudioSrcChannelLayout = mAudioTgtChannelLayout =
         av_get_default_channel_layout(channels);
 }
@@ -1176,6 +1181,13 @@ int32_t SoftFFmpegAudio::openDecoder() {
     if (!mFrame) {
         ALOGE("oom for video frame");
         return ERR_OOM;
+    }
+
+    if (mHighResAudioEnabled) {
+        int bits = av_get_bytes_per_sample(mCtx->sample_fmt) * 8;
+        if (bits >= 24) {
+            mAudioTgtFmt = AV_SAMPLE_FMT_S32;
+        }
     }
 
 	return ERR_OK;
