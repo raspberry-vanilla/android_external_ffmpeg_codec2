@@ -120,22 +120,23 @@ private:
     uint8_t *mResampledData;
     int32_t mResampledDataSize;
 
-    int mAudioSrcFreq;
-    int mAudioTgtFreq;
-    int mAudioSrcChannels;
-    int mAudioTgtChannels;
+    int32_t mAudioSrcFreq;
+    int32_t mAudioTgtFreq;
+    int32_t mAudioSrcChannels;
+    int32_t mAudioTgtChannels;
     int64_t mAudioSrcChannelLayout;
     int64_t mAudioTgtChannelLayout;
     enum AVSampleFormat mAudioSrcFmt;
     enum AVSampleFormat mAudioTgtFmt;
-
-    bool mHighResAudioEnabled;
 
     enum {
         NONE,
         AWAITING_DISABLED,
         AWAITING_ENABLED
     } mOutputPortSettingsChange;
+
+    bool mHighResAudioEnabled;
+    bool mOutputReconfigured;
 
     void setMode(const char *name);
 	void initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE &def);

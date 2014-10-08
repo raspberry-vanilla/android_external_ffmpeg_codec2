@@ -488,14 +488,22 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
     }
 
     if (meta != NULL) {
-        ALOGI("bit_rate: %d, sample_rate: %d, channels: %d, "
-                "bits_per_coded_sample: %d, block_align:%d",
+        ALOGD("bit_rate: %d, sample_rate: %d, channels: %d, "
+                "bits_per_coded_sample: %d, block_align: %d "
+                "bits_per_raw_sample: %d, sample_format: %d",
                 avctx->bit_rate, avctx->sample_rate, avctx->channels,
-                avctx->bits_per_coded_sample, avctx->block_align);
+                avctx->bits_per_coded_sample, avctx->block_align,
+                avctx->bits_per_raw_sample, avctx->sample_fmt);
+
+        int32_t bitsPerSample = 16;
+
+        if (av_get_bytes_per_sample(avctx->sample_fmt) > 2) {
+            bitsPerSample = 24;
+        }
 
         meta->setInt32(kKeyChannelCount, avctx->channels);
         meta->setInt32(kKeyBitRate, avctx->bit_rate);
-        meta->setInt32(kKeySampleBits, avctx->bits_per_coded_sample);
+        meta->setInt32(kKeySampleBits, bitsPerSample);
         meta->setInt32(kKeySampleRate, avctx->sample_rate);
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);
@@ -1502,6 +1510,8 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
     case AV_CODEC_ID_VP9:
 	//audio
     case AV_CODEC_ID_AAC:
+    case AV_CODEC_ID_AC3:
+    case AV_CODEC_ID_EAC3:
     case AV_CODEC_ID_MP3:
     case AV_CODEC_ID_AMR_NB:
     case AV_CODEC_ID_AMR_WB:
