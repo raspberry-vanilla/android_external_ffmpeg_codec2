@@ -1508,6 +1508,7 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
     case AV_CODEC_ID_VP6:
     case AV_CODEC_ID_VP8:
     case AV_CODEC_ID_VP9:
+    case AV_CODEC_ID_WMV3:
 	//audio
     case AV_CODEC_ID_AAC:
     case AV_CODEC_ID_AC3:
@@ -1517,6 +1518,10 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
     case AV_CODEC_ID_AMR_WB:
     case AV_CODEC_ID_FLAC:
     case AV_CODEC_ID_VORBIS:
+    case AV_CODEC_ID_WMAV1:
+    case AV_CODEC_ID_WMAV2:
+    case AV_CODEC_ID_WMAPRO:
+    case AV_CODEC_ID_WMALOSSLESS:
     case AV_CODEC_ID_PCM_MULAW: //g711
     case AV_CODEC_ID_PCM_ALAW:  //g711
     case AV_CODEC_ID_GSM_MS:
