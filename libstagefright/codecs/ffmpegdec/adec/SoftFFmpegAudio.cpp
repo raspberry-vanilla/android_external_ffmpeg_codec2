@@ -380,8 +380,8 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->eNumData = OMX_NumericalDataSigned;
             profile->eEndian = OMX_EndianBig;
             profile->bInterleaved = OMX_TRUE;
-            profile->nBitPerSample = 16;
             profile->ePCMMode = OMX_AUDIO_PCMModeLinear;
+            profile->nBitPerSample = mAudioTgtFmt == AV_SAMPLE_FMT_S32 ? 24 : 16;
 
             if (getOMXChannelMapping(mAudioSrcChannels, profile->eChannelMapping) != OK) {
                 return OMX_ErrorNone;
@@ -761,21 +761,20 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
+            enum AVSampleFormat targetFmt = AV_SAMPLE_FMT_S16;
+            if (mHighResAudioEnabled && profile->nBitPerSample > 16) {
+                targetFmt = AV_SAMPLE_FMT_S32;
+            }
+            mAudioTgtFreq = profile->nSamplingRate;
+            mAudioTgtChannels = profile->nChannels;
+            mAudioTgtFmt = targetFmt;
+
             if (!isConfigured()) {
                 mCtx->channels = profile->nChannels;
                 mCtx->sample_rate = profile->nSamplingRate;
-
             } else {
-                // port reconfiguration
-                enum AVSampleFormat targetFmt = AV_SAMPLE_FMT_S16;
-                if (mHighResAudioEnabled && profile->nBitPerSample > 16) {
-                    targetFmt = AV_SAMPLE_FMT_S32;
-                }
                 if (targetFmt != mAudioTgtFmt || profile->nSamplingRate != mAudioTgtFreq ||
                         profile->nChannels != mAudioTgtChannels) {
-                    mAudioTgtFreq = profile->nSamplingRate;
-                    mAudioTgtChannels = profile->nChannels;
-                    mAudioTgtFmt = targetFmt;
                     mOutputReconfigured = true;
                 }
             }
