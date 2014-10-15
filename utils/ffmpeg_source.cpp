@@ -111,6 +111,7 @@ static int android_open(URLContext *h, const char *url, int flags)
     // the url in form of "android-source:<DataSource Ptr>",
     // the DataSource Pointer passed by the ffmpeg extractor
     DataSource *source = NULL;
+    char url_check[PATH_MAX] = {0};
 
     ALOGV("android source begin open");
 
@@ -122,9 +123,30 @@ static int android_open(URLContext *h, const char *url, int flags)
     ALOGV("android open, url: %s", url);
     sscanf(url + strlen("android-source:"), "%p", &source);
     if(source == NULL){
-        ALOGE("ffmpeg open data source error!");
+        ALOGE("ffmpeg open data source error! (invalid source)");
         return -1;
     }
+
+    snprintf(url_check, sizeof(url_check), "android-source:%p",
+                source);
+
+    if (strcmp(url_check, url) != 0) {
+
+        String8 uri = source->getUri();
+        if (!uri.string()) {
+            ALOGE("ffmpeg open data source error! (source uri)");
+            return -1;
+        }
+
+        snprintf(url_check, sizeof(url_check), "android-source:%p|file:%s",
+                    source, uri.string());
+
+        if (strcmp(url_check, url) != 0) {
+            ALOGE("ffmpeg open data source error! (url check)");
+            return -1;
+        }
+    }
+
     ALOGV("ffmpeg open android data source success, source ptr: %p", source);
 
     FFSource *ffs = new FFSource(source);
