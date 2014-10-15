@@ -79,8 +79,9 @@ int FFSource::read(unsigned char *buf, size_t size)
         ALOGE("FFSource readAt failed");
         return AVERROR(errno);
     }
-    assert(n >= 0);
-    mOffset += n;
+    if (n > 0) {
+        mOffset += n;
+    }
 
     return n;
 }
