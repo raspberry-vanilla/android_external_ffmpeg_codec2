@@ -709,7 +709,7 @@ void SoftFFmpegAudio::adjustAudioParams() {
     if (mHighResAudioEnabled) {
         max_rate = 192000;
         int bits = av_get_bytes_per_sample(mCtx->sample_fmt) * 8;
-        if (bits >= 24) {
+        if (bits >= 24 || mCtx->codec_id == AV_CODEC_ID_DTS || mCtx->codec_id == AV_CODEC_ID_AC3) {
             sample_fmt = AV_SAMPLE_FMT_S32;
             ALOGD("Enabled high-resolution audio for sample format %d", sample_fmt);
         }
@@ -733,6 +733,9 @@ void SoftFFmpegAudio::adjustAudioParams() {
     }
 
     mAudioSrcFmt = mCtx->sample_fmt;
+
+    ALOGV("mCtx->sample_fmt=%d mAudioTgtFmt=%d", mCtx->sample_fmt, mAudioTgtFmt);
+
     if (mAudioTgtFmt == AV_SAMPLE_FMT_NONE) {
         mAudioTgtFmt = sample_fmt;
     }
