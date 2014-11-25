@@ -487,15 +487,18 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            profile->nBitRate = 0;
             profile->eFormat = OMX_AUDIO_WMAFormatUnused;
 
             if (isConfigured()) {
                 profile->nChannels = mCtx->channels;
                 profile->nSamplingRate = mCtx->sample_rate;
+                profile->nBlockAlign = mCtx->block_align;
+                profile->nBitRate = mCtx->bit_rate;
             } else {
                 profile->nChannels = 0;
                 profile->nSamplingRate = 0;
+                profile->nBlockAlign = 0;
+                profile->nBitRate = 0;
             }
 
             return OMX_ErrorNone;
@@ -510,16 +513,16 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            profile->nChannels = 0;
-            profile->nSamplingRate = 0;
             profile->eFormat = OMX_AUDIO_RAFormatUnused;
 
             if (isConfigured()) {
                 profile->nChannels = mCtx->channels;
                 profile->nSamplingRate = mCtx->sample_rate;
+                profile->nNumRegions = mCtx->block_align;
             } else {
                 profile->nChannels = 0;
                 profile->nSamplingRate = 0;
+                profile->nNumRegions = 0;
             }
 
             return OMX_ErrorNone;
@@ -534,7 +537,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            profile->nBitsPerSample = 0;
+            profile->nBitsPerSample = 16;
 
             if (isConfigured()) {
                 profile->nChannels = mCtx->channels;
@@ -599,9 +602,11 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             if (isConfigured()) {
                 profile->nChannels = mCtx->channels;
                 profile->nSamplingRate = mCtx->sample_rate;
+                profile->nBitsPerSample = mCtx->bits_per_coded_sample;
             } else {
                 profile->nChannels = 0;
                 profile->nSamplingRate = 0;
+                profile->nBitsPerSample = 16;
             }
 
             return OMX_ErrorNone;
@@ -1536,7 +1541,7 @@ void SoftFFmpegAudio::drainEOSOutputBuffer() {
 
     ALOGD("ffmpeg audio decoder fill eos outbuf");
 
-    outHeader->nTimeStamp = 0;
+    outHeader->nTimeStamp = mAudioClock;
     outHeader->nFilledLen = 0;
     outHeader->nFlags = OMX_BUFFERFLAG_EOS;
 
