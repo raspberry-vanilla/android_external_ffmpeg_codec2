@@ -41,7 +41,7 @@ static void InitOMXParams(T *params) {
 }
 
 void SoftFFmpegVideo::setMode(const char *name) {
-    if (!strcmp(name, "OMX.ffmpeg.mpeg2v.decoder")) {
+    if (!strcmp(name, "OMX.ffmpeg.mpeg2.decoder")) {
         mMode = MODE_MPEG2;
     } else if (!strcmp(name, "OMX.ffmpeg.h263.decoder")) {
         mMode = MODE_H263;
@@ -490,7 +490,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::isRoleSupported(
     switch (mMode) {
     case MODE_MPEG2:
         if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.mpeg2v", OMX_MAX_STRINGNAME_SIZE - 1))
+                "video_decoder.mpeg2", OMX_MAX_STRINGNAME_SIZE - 1))
             supported = false;
             break;
     case MODE_H263:
