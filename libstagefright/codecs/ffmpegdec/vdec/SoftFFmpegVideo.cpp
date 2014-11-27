@@ -24,10 +24,12 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 
+#include "SoftFFmpegAudio.h"
+
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
 
-static int decoder_reorder_pts = -1;
+static int decoder_reorder_pts = 1;
 
 namespace android {
 
@@ -90,10 +92,12 @@ SoftFFmpegVideo::SoftFFmpegVideo(
       mExtradataReady(false),
       mIgnoreExtradata(false),
       mSignalledError(false),
-      mDoDeinterlace(true),
+      mDoDeinterlace(false),
       mWidth(320),
       mHeight(240),
       mStride(320),
+      mLastFrameDelay(0),
+      mLastPTS(0),
       mOutputPortSettingsChange(NONE) {
 
     ALOGD("SoftFFmpegVideo component: %s mMode: %d appData: %p", name, mMode, appData);
@@ -233,10 +237,10 @@ void SoftFFmpegVideo::initPorts() {
 }
 
 void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec) {
-    int fast = 0;
+    int fast = 1;
 
     avctx->workaround_bugs   = 1;
-    avctx->lowres            = 0;
+    avctx->lowres            = 1;
     if(avctx->lowres > codec->max_lowres){
         ALOGW("The maximum value for lowres supported by the decoder is %d",
                 codec->max_lowres);
@@ -245,7 +249,7 @@ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->idct_algo         = 0;
     avctx->skip_frame        = AVDISCARD_DEFAULT;
     avctx->skip_idct         = AVDISCARD_DEFAULT;
-    avctx->skip_loop_filter  = AVDISCARD_DEFAULT;
+    avctx->skip_loop_filter  = AVDISCARD_ALL;
     avctx->error_concealment = 3;
 
     if(avctx->lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
@@ -822,7 +826,7 @@ void SoftFFmpegVideo::initPacket(AVPacket *pkt,
 }
 
 int32_t SoftFFmpegVideo::decodeVideo() {
-    int len = 0;
+    int len = 0, err = 0;
     int gotPic = false;
     int32_t ret = ERR_OK;
     bool is_flush = (mEOSStatus != INPUT_DATA_AVAILABLE);
@@ -838,10 +842,30 @@ int32_t SoftFFmpegVideo::decodeVideo() {
 
     AVPacket pkt;
     initPacket(&pkt, inHeader);
+
     //av_frame_unref(mFrame); //Don't unref mFrame!!!
     avcodec_get_frame_defaults(mFrame);
 
-    int err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
+    // how long should this frame be displayed
+    int64_t duration = pkt.pts - mLastPTS;
+    mLastPTS = pkt.pts;
+
+    // how long since we've rendered
+    int64_t now = get_timestamp();
+    int64_t delay = mLastFrameDelay == 0 ? 0 : (now - mLastFrameDelay);
+    mLastFrameDelay = now;
+
+    // are we too far behind the audio?
+    int64_t audioClock = SoftFFmpegAudio::getAudioClock();
+    int64_t delta = audioClock - pkt.pts;
+    bool drop = audioClock > 0 && (fabs(delta) > duration * 2);
+
+    ALOGV("sync: pts=%lld last=%lld a_clock=%lld delta=%lld delay=%lld drop=%d", pkt.pts, mLastPTS, audioClock, delta, delay, drop);
+
+    if (!drop) {
+        err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
+    }
+
     if (err < 0) {
         ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);
         //don't send error to OMXCodec, skip!
@@ -849,7 +873,7 @@ int32_t SoftFFmpegVideo::decodeVideo() {
     } else {
         mPendingSettingChangeEvent = isPortSettingChanged();
 
-        if (!gotPic) {
+        if (!gotPic || drop) {
             ALOGI("ffmpeg video decoder failed to get frame.");
             //stop sending empty packets if the decoder is finished
             if (is_flush && mCtx->codec->capabilities & CODEC_CAP_DELAY) {
@@ -1079,7 +1103,13 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex) {
         }
 
         inInfo   = *inQueue.begin();
+        if (inInfo == NULL) {
+            continue;
+        }
         inHeader = inInfo->mHeader;
+        if (inHeader == NULL) {
+            continue;
+        }
 
         if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
             ALOGD("ffmpeg video decoder empty eos inbuf");

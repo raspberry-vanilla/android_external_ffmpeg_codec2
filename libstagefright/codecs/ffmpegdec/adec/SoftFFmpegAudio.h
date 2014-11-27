@@ -37,6 +37,11 @@ struct SoftFFmpegAudio : public SimpleSoftOMXComponent {
             OMX_PTR appData,
             OMX_COMPONENTTYPE **component);
 
+public:
+    static int64_t *sAudioClock;
+    static int64_t getAudioClock(void);
+    static void setAudioClock(int64_t value);
+
 protected:
     virtual ~SoftFFmpegAudio();
 
@@ -49,6 +54,7 @@ protected:
     virtual void onQueueFilled(OMX_U32 portIndex);
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onPortEnableCompleted(OMX_U32 portIndex, bool enabled);
+
 
 private:
     enum {
@@ -107,7 +113,6 @@ private:
 
     bool mSignalledError;
 
-    int64_t mAudioClock;
     int32_t mInputBufferSize;
 
     //"Fatal signal 7 (SIGBUS)"!!! SIGBUS is because of an alignment exception
@@ -120,10 +125,10 @@ private:
     uint8_t *mResampledData;
     int32_t mResampledDataSize;
 
-    int32_t mAudioSrcFreq;
-    int32_t mAudioTgtFreq;
-    int32_t mAudioSrcChannels;
-    int32_t mAudioTgtChannels;
+    uint32_t mAudioSrcFreq;
+    uint32_t mAudioTgtFreq;
+    uint32_t mAudioSrcChannels;
+    uint32_t mAudioTgtChannels;
     int64_t mAudioSrcChannelLayout;
     int64_t mAudioTgtChannelLayout;
     enum AVSampleFormat mAudioSrcFmt;
@@ -155,8 +160,8 @@ private:
     int32_t handleExtradata();
     int32_t handleVorbisExtradata(OMX_BUFFERHEADERTYPE *inHeader);
     int32_t openDecoder();
-	void    updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader);
-	void    initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
+    void    updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader);
+    void    initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
 	int32_t decodeAudio();
     int32_t resampleAudio();
     void    drainOneOutputBuffer();

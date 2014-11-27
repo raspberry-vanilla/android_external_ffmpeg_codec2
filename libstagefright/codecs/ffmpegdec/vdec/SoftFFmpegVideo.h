@@ -100,6 +100,9 @@ private:
     bool mDoDeinterlace;
     int32_t mWidth, mHeight, mStride;
 
+    int64_t mLastFrameDelay;
+    int64_t mLastPTS;
+
     enum {
         NONE,
         AWAITING_DISABLED,

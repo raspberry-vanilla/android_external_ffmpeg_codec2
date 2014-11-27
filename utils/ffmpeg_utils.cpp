@@ -31,6 +31,7 @@ extern "C" {
 #include <inttypes.h>
 #include <math.h>
 #include <limits.h> /* INT_MAX */
+#include <time.h>
 
 #undef strncpy
 #include <string.h>
@@ -530,6 +531,12 @@ bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
     *extradata_size = p - *extradata;
 
     return true;
+}
+
+int64_t get_timestamp() {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
 }  // namespace android

@@ -69,6 +69,8 @@ void SoftFFmpegAudio::setMode(const char *name) {
     }
 }
 
+int64_t *SoftFFmpegAudio::sAudioClock;
+
 SoftFFmpegAudio::SoftFFmpegAudio(
         const char *name,
         const OMX_CALLBACKTYPE *callbacks,
@@ -85,7 +87,6 @@ SoftFFmpegAudio::SoftFFmpegAudio(
       mFrame(NULL),
       mEOSStatus(INPUT_DATA_AVAILABLE),
       mSignalledError(false),
-      mAudioClock(0),
       mInputBufferSize(0),
       mResampledData(NULL),
       mResampledDataSize(0),
@@ -93,6 +94,8 @@ SoftFFmpegAudio::SoftFFmpegAudio(
       mOutputReconfigured(false) {
 
     setMode(name);
+
+    setAudioClock(0);
 
     char value[PROPERTY_VALUE_MAX] = {0};
     property_get("audio.offload.24bit.enable", value, "0");
@@ -236,17 +239,17 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
 }
 
 bool SoftFFmpegAudio::isConfigured() {
-	return mAudioSrcChannels != -1;
+	return mAudioSrcChannels > 0;
 }
 
 void SoftFFmpegAudio::resetCtx() {
-    mCtx->channels = -1;
-    mCtx->sample_rate = -1;
-    mCtx->bit_rate = -1;
+    mCtx->channels = 0;
+    mCtx->sample_rate = 0;
+    mCtx->bit_rate = 0;
     mCtx->sample_fmt = AV_SAMPLE_FMT_NONE;
 
-    mAudioSrcChannels = mAudioTgtChannels = -1;
-    mAudioSrcFreq = mAudioTgtFreq = -1;
+    mAudioSrcChannels = mAudioTgtChannels = 0;
+    mAudioSrcFreq = mAudioTgtFreq = 0;
     mAudioSrcFmt = mAudioTgtFmt = AV_SAMPLE_FMT_NONE;
     mAudioSrcChannelLayout = mAudioTgtChannelLayout = 0;
 }
@@ -769,12 +772,12 @@ void SoftFFmpegAudio::adjustAudioParams() {
     }
 
     mAudioSrcChannels = channels;
-    if (mAudioTgtChannels < 0) {
+    if (!mAudioTgtChannels) {
         mAudioTgtChannels = channels;
     }
 
     mAudioSrcFreq = sampling_rate;
-    if (mAudioTgtFreq < 0) {
+    if (!mAudioTgtFreq) {
         mAudioTgtFreq = sampling_rate;
     }
 
@@ -1275,7 +1278,7 @@ void SoftFFmpegAudio::updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader) {
 
     //update the audio clock if the pts is valid
     if (inHeader->nTimeStamp != AV_NOPTS_VALUE) {
-        mAudioClock = inHeader->nTimeStamp;
+        setAudioClock(inHeader->nTimeStamp);
     }
 }
 
@@ -1321,8 +1324,8 @@ int32_t SoftFFmpegAudio::decodeAudio() {
         CHECK(inInfo != NULL);
         inHeader = inInfo->mHeader;
 
-		if (mInputBufferSize == 0) {
-		    updateTimeStamp(inHeader);
+        if (mInputBufferSize == 0) {
+            updateTimeStamp(inHeader);
             mInputBufferSize = inHeader->nFilledLen;
         }
     }
@@ -1496,9 +1499,16 @@ int32_t SoftFFmpegAudio::resampleAudio() {
 
 void SoftFFmpegAudio::drainOneOutputBuffer() {
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
-	BufferInfo *outInfo = *outQueue.begin();
-	CHECK(outInfo != NULL);
-	OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
+    BufferInfo *outInfo = *outQueue.begin();
+    CHECK(outInfo != NULL);
+    OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
+    List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
+    BufferInfo *inInfo = *inQueue.begin();
+    OMX_BUFFERHEADERTYPE *inHeader = NULL;
+
+    if (inHeader != NULL) {
+        inHeader = inInfo->mHeader;
+    }
 
 	CHECK_GT(mResampledDataSize, 0);
 
@@ -1509,7 +1519,7 @@ void SoftFFmpegAudio::drainOneOutputBuffer() {
 
     outHeader->nOffset = 0;
     outHeader->nFilledLen = copy;
-    outHeader->nTimeStamp = mAudioClock; 
+    outHeader->nTimeStamp = getAudioClock();
     memcpy(outHeader->pBuffer, mResampledData, copy);
     outHeader->nFlags = 0;
 
@@ -1519,11 +1529,11 @@ void SoftFFmpegAudio::drainOneOutputBuffer() {
 
     //update audio pts
     size_t frames = copy / (av_get_bytes_per_sample(mAudioTgtFmt) * mAudioTgtChannels);
-    mAudioClock += (frames * 1000000ll) / mAudioTgtFreq;
+    setAudioClock(getAudioClock() + ((frames * 1000000ll) / mAudioTgtFreq));
 
 #if DEBUG_FRM
-    ALOGV("ffmpeg audio decoder, fill out buffer, copy:%u, pts: %lld",
-            copy, outHeader->nTimeStamp);
+    ALOGV("ffmpeg audio decoder, fill out buffer, copy:%u, pts: %lld, clock: %lld",
+            copy, outHeader->nTimeStamp, getAudioClock());
 #endif
 
     outQueue.erase(outQueue.begin());
@@ -1541,7 +1551,7 @@ void SoftFFmpegAudio::drainEOSOutputBuffer() {
 
     ALOGD("ffmpeg audio decoder fill eos outbuf");
 
-    outHeader->nTimeStamp = mAudioClock;
+    outHeader->nTimeStamp = getAudioClock();
     outHeader->nFilledLen = 0;
     outHeader->nFlags = OMX_BUFFERFLAG_EOS;
 
@@ -1588,7 +1598,7 @@ void SoftFFmpegAudio::drainAllOutputBuffers() {
     }
 }
 
-void SoftFFmpegAudio::onQueueFilled(OMX_U32 portIndex) {
+void SoftFFmpegAudio::onQueueFilled(OMX_U32 /* portIndex */) {
     BufferInfo *inInfo = NULL;
     OMX_BUFFERHEADERTYPE *inHeader = NULL;
 
@@ -1669,7 +1679,7 @@ void SoftFFmpegAudio::onPortFlushCompleted(OMX_U32 portIndex) {
             avcodec_flush_buffers(mCtx);
         }
 
-	    mAudioClock = 0;
+	    setAudioClock(0);
 	    mInputBufferSize = 0;
 	    mResampledDataSize = 0;
 	    mResampledData = NULL;
@@ -1701,6 +1711,22 @@ void SoftFFmpegAudio::onPortEnableCompleted(OMX_U32 portIndex, bool enabled) {
             break;
         }
     }
+}
+
+int64_t SoftFFmpegAudio::getAudioClock() {
+    if (sAudioClock == NULL) {
+        sAudioClock = (int64_t*) malloc(sizeof(int64_t));
+        *sAudioClock = 0;
+    }
+    ALOGV("getAudioClock: %lld", *sAudioClock);
+    return *sAudioClock;
+}
+
+void SoftFFmpegAudio::setAudioClock(int64_t ticks) {
+    if (sAudioClock == NULL) {
+        sAudioClock = (int64_t*) malloc(sizeof(int64_t));
+    }
+    *sAudioClock = ticks;
 }
 
 }  // namespace android

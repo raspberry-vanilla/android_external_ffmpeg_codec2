@@ -11,6 +11,7 @@ LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/../../../.. \
 	$(TOP)/frameworks/av/media/libstagefright/include \
 	$(TOP)/frameworks/native/include/media/openmax \
+	$(TOP)/external/stagefright-plugins/libstagefright/codecs/ffmpegdec/adec
 
 LOCAL_C_INCLUDES += \
 	$(FFMPEG_SRC_DIR) \
@@ -25,7 +26,8 @@ LOCAL_SHARED_LIBRARIES := \
 	libffmpeg_utils   \
 	libstagefright    \
 	libstagefright_omx \
-	libstagefright_foundation
+	libstagefright_foundation \
+	libstagefright_soft_ffmpegadec
 
 LOCAL_MODULE := libstagefright_soft_ffmpegvdec
 LOCAL_MODULE_TAGS := optional

@@ -105,6 +105,8 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block);
 bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
 		const uint8_t *header_start[3], const int header_len[3]);
 
+int64_t get_timestamp(void);
+
 }  // namespace android
 
 #endif  // FFMPEG_UTILS_H_
