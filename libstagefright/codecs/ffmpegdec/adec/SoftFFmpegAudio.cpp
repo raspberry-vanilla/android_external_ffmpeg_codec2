@@ -26,6 +26,9 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/OMXCodec.h>
 
+#include <OMX_AudioExt.h>
+#include <OMX_IndexExt.h>
+
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
 
@@ -149,7 +152,7 @@ void SoftFFmpegAudio::initInputFormat(uint32_t mode,
         break;
     case MODE_AC3:
         def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_AC3);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingAC3;
+        def.format.audio.eEncoding = OMX_AUDIO_CodingAndroidAC3;
         break;
     case MODE_APE:
         def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_APE);
@@ -370,7 +373,7 @@ void SoftFFmpegAudio::deInitDecoder() {
 OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
         OMX_INDEXTYPE index, OMX_PTR params) {
     ALOGV("internalGetParameter index:0x%x", index);
-    switch (index) {
+    switch ((int)index) {
         case OMX_IndexParamAudioPcm:
         {
             OMX_AUDIO_PARAM_PCMMODETYPE *profile =
@@ -576,6 +579,27 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             return OMX_ErrorNone;
         }
+
+        case OMX_IndexParamAudioAndroidAc3:
+        {
+            OMX_AUDIO_PARAM_ANDROID_AC3TYPE *profile =
+                (OMX_AUDIO_PARAM_ANDROID_AC3TYPE *)params;
+
+            if (profile->nPortIndex != kInputPortIndex) {
+                return OMX_ErrorUndefined;
+            }
+
+            if (isConfigured()) {
+                profile->nChannels = mCtx->channels;
+                profile->nSampleRate = mCtx->sample_rate;
+            } else {
+                profile->nChannels = 0;
+                profile->nSampleRate = 0;
+            }
+
+            return OMX_ErrorNone;
+        }
+
 
         case OMX_IndexParamAudioAc3:
         {
@@ -800,7 +824,7 @@ void SoftFFmpegAudio::adjustAudioParams() {
 OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
         OMX_INDEXTYPE index, const OMX_PTR params) {
     //ALOGV("internalSetParameter index:0x%x", index);
-    switch (index) {
+    switch ((int)index) {
         case OMX_IndexParamStandardComponentRole:
         {
             const OMX_PARAM_COMPONENTROLETYPE *roleParams =
@@ -1047,6 +1071,29 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
 
             return OMX_ErrorNone;
         }
+
+        case OMX_IndexParamAudioAndroidAc3:
+        {
+            OMX_AUDIO_PARAM_ANDROID_AC3TYPE *profile =
+                (OMX_AUDIO_PARAM_ANDROID_AC3TYPE *)params;
+
+            if (profile->nPortIndex != kInputPortIndex) {
+                return OMX_ErrorUndefined;
+            }
+
+            CHECK(!isConfigured());
+
+            mCtx->channels = profile->nChannels;
+            mCtx->sample_rate = profile->nSampleRate;
+
+            adjustAudioParams();
+
+            ALOGV("set OMX_IndexParamAudioAndroidAc3, nChannels:%lu, nSampleRate:%lu",
+                profile->nChannels, profile->nSampleRate);
+
+            return OMX_ErrorNone;
+        }
+
 
         case OMX_IndexParamAudioApe:
         {
