@@ -152,7 +152,7 @@ void SoftFFmpegAudio::initInputFormat(uint32_t mode,
         break;
     case MODE_AC3:
         def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_AC3);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingAndroidAC3;
+        def.format.audio.eEncoding = (OMX_AUDIO_CODINGTYPE)OMX_AUDIO_CodingAndroidAC3;
         break;
     case MODE_APE:
         def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_APE);
