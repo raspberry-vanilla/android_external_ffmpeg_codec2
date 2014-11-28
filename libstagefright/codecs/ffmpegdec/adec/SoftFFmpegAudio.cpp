@@ -390,9 +390,13 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
                 return OMX_ErrorNone;
             }
 
-            CHECK(isConfigured());
-            profile->nChannels = mAudioSrcChannels;
-            profile->nSamplingRate = mAudioSrcFreq;
+            if (isConfigured()) {
+                profile->nChannels = mAudioTgtChannels;
+                profile->nSamplingRate = mAudioTgtFreq;
+            } else {
+                profile->nChannels = 0;
+                profile->nSamplingRate = 0;
+            }
 
             //mCtx has been updated(adjustAudioParams)!
             ALOGV("get pcm params, nChannels:%lu, nSamplingRate:%lu, nBitsPerSample:%lu",
