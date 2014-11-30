@@ -495,15 +495,9 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
                 avctx->bits_per_coded_sample, avctx->block_align,
                 avctx->bits_per_raw_sample, avctx->sample_fmt);
 
-        int32_t pcmFormat = AUDIO_FORMAT_PCM_16_BIT;
-
-        if (av_get_bytes_per_sample(avctx->sample_fmt) > 2) {
-            pcmFormat = AUDIO_FORMAT_PCM_8_24_BIT;
-        }
-
         meta->setInt32(kKeyChannelCount, avctx->channels);
         meta->setInt32(kKeyBitRate, avctx->bit_rate);
-        //meta->setInt32(kKeyPcmFormat, pcmFormat);
+        meta->setInt32(kKeyBitsPerSample, av_get_bytes_per_sample(avctx->sample_fmt) > 2 ? 24 : 16);
         meta->setInt32(kKeySampleRate, avctx->sample_rate);
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);

@@ -141,7 +141,7 @@ private:
     } mOutputPortSettingsChange;
 
     bool mHighResAudioEnabled;
-    bool mOutputReconfigured;
+    bool mReconfiguring;
 
     void setMode(const char *name);
 	void initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE &def);
