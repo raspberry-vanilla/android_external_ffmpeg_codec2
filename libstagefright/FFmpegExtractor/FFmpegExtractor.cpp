@@ -165,7 +165,7 @@ sp<MediaSource> FFmpegExtractor::getTrack(size_t index) {
     return new FFmpegSource(this, index);
 }
 
-sp<MetaData> FFmpegExtractor::getTrackMetaData(size_t index, uint32_t flags) {
+sp<MetaData> FFmpegExtractor::getTrackMetaData(size_t index, uint32_t flags __unused) {
     ALOGV("FFmpegExtractor::getTrackMetaData[%d]", index);
 
     if (mInitCheck != OK) {
@@ -1099,11 +1099,11 @@ void FFmpegExtractor::readerEntry() {
         ret = av_read_frame(mFormatCtx, pkt);
         mProbePkts++;
         if (ret < 0) {
-            if (ret == AVERROR_EOF || url_feof(mFormatCtx->pb))
+            if (ret == AVERROR_EOF || mFormatCtx->pb->eof_reached)
                 if (ret == AVERROR_EOF) {
                     //ALOGV("ret == AVERROR_EOF");
                 }
-                if (url_feof(mFormatCtx->pb)) {
+                if (mFormatCtx->pb->eof_reached) {
                     //ALOGV("url_feof(mFormatCtx->pb)");
                 }
 
@@ -1258,7 +1258,7 @@ FFmpegSource::~FFmpegSource() {
 	mExtractor = NULL;
 }
 
-status_t FFmpegSource::start(MetaData *params) {
+status_t FFmpegSource::start(MetaData *params __unused) {
     ALOGV("FFmpegSource::start %s",
             av_get_media_type_string(mMediaType));
     return OK;
@@ -1502,20 +1502,13 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
     case AV_CODEC_ID_VP6:
     case AV_CODEC_ID_VP8:
     case AV_CODEC_ID_VP9:
-    case AV_CODEC_ID_WMV3:
 	//audio
     case AV_CODEC_ID_AAC:
-    case AV_CODEC_ID_AC3:
-    case AV_CODEC_ID_EAC3:
     case AV_CODEC_ID_MP3:
     case AV_CODEC_ID_AMR_NB:
     case AV_CODEC_ID_AMR_WB:
     case AV_CODEC_ID_FLAC:
     case AV_CODEC_ID_VORBIS:
-    case AV_CODEC_ID_WMAV1:
-    case AV_CODEC_ID_WMAV2:
-    case AV_CODEC_ID_WMAPRO:
-    case AV_CODEC_ID_WMALOSSLESS:
     case AV_CODEC_ID_PCM_MULAW: //g711
     case AV_CODEC_ID_PCM_ALAW:  //g711
     case AV_CODEC_ID_GSM_MS:

@@ -106,7 +106,7 @@ off64_t FFSource::getSize()
 
 /////////////////////////////////////////////////////////////////
 
-static int android_open(URLContext *h, const char *url, int flags)
+static int android_open(URLContext *h, const char *url, int flags __unused)
 {
     // the url in form of "android-source:<DataSource Ptr>",
     // the DataSource Pointer passed by the ffmpeg extractor
@@ -162,7 +162,7 @@ static int android_read(URLContext *h, unsigned char *buf, int size)
     return ffs->read(buf, size);
 }
 
-static int android_write(URLContext *h, const unsigned char *buf, int size)
+static int android_write(URLContext *h __unused, const unsigned char *buf __unused, int size __unused)
 {
     return -1;
 }
@@ -216,7 +216,7 @@ void ffmpeg_register_android_source()
     ff_android_protocol.url_get_file_handle = android_get_handle;
     ff_android_protocol.url_check           = android_check;
     
-    ffurl_register_protocol(&ff_android_protocol, sizeof(URLProtocol));
+    ffurl_register_protocol(&ff_android_protocol);
 }
 
 }  // namespace android

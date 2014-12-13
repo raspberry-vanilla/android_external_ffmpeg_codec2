@@ -1173,7 +1173,7 @@ int32_t SoftFFmpegAudio::openDecoder() {
             av_get_sample_fmt_name(mCtx->sample_fmt),
             mCtx->bits_per_coded_sample, mCtx->bits_per_raw_sample);
 
-    mFrame = avcodec_alloc_frame();
+    mFrame = av_frame_alloc();
     if (!mFrame) {
         ALOGE("oom for video frame");
         return ERR_OOM;
@@ -1252,7 +1252,6 @@ int32_t SoftFFmpegAudio::decodeAudio() {
     AVPacket pkt;
     initPacket(&pkt, inHeader);
     av_frame_unref(mFrame);
-    avcodec_get_frame_defaults(mFrame);
 
     len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, &pkt);
     //a negative error code is returned if an error occurred during decoding
