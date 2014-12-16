@@ -250,6 +250,7 @@ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->skip_idct         = AVDISCARD_DEFAULT;
     avctx->skip_loop_filter  = AVDISCARD_ALL;
     avctx->error_concealment = 3;
+    avctx->thread_count      = 0;
 
     if(avctx->lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
     if (fast)   avctx->flags2 |= CODEC_FLAG2_FAST;
