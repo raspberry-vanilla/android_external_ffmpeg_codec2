@@ -232,6 +232,8 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->skip_loop_filter  = AVDISCARD_DEFAULT;
     avctx->error_concealment = 3;
 
+    avctx->flags |= CODEC_FLAG_BITEXACT;
+
     if(avctx->lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
     if (fast)   avctx->flags2 |= CODEC_FLAG2_FAST;
     if(codec->capabilities & CODEC_CAP_DR1)
@@ -385,9 +387,11 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->bInterleaved = OMX_TRUE;
             profile->ePCMMode = OMX_AUDIO_PCMModeLinear;
 
-            // FIXME when floating point handshake is done
-            profile->nBitPerSample = av_get_bytes_per_sample(
-                    isConfigured() ? mAudioTgtFmt : mCtx->sample_fmt) > 2 ? 24 : 16;
+            if (isConfigured()) {
+                profile->nBitPerSample = av_get_bytes_per_sample(mAudioTgtFmt) > 2 ? 24 : 16;
+            } else {
+                profile->nBitPerSample = mHighResAudioEnabled ? 24 : 16;
+            }
 
             if (getOMXChannelMapping(mAudioTgtChannels, profile->eChannelMapping) != OK) {
                 return OMX_ErrorNone;
@@ -747,8 +751,8 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            if (mHighResAudioEnabled && profile->nBitPerSample > 16) {
-                // FIXME when floating point handshake is done
+            if (mHighResAudioEnabled &&
+                    (profile->nBitPerSample > 16 || profile->nBitPerSample == 0)) {
                 mAudioTgtFmt = AV_SAMPLE_FMT_S32;
             } else {
                 mAudioTgtFmt = AV_SAMPLE_FMT_S16;
