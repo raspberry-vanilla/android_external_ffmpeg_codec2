@@ -184,8 +184,14 @@ void SoftFFmpegAudio::initPorts() {
     def.nBufferCountMin = kNumInputBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
 
-    // max aggregated buffer size from nuplayer
-    def.nBufferSize = 24 * 1024;
+    if (mMode == MODE_APE) {
+        def.nBufferSize = 1000000; // ape!
+    } else if (mMode == MODE_DTS) {
+        def.nBufferSize = 1000000; // dts!
+    } else {
+        // max aggregated buffer size from nuplayer
+        def.nBufferSize = 24 * 1024;
+    }
 
     def.bEnabled = OMX_TRUE;
     def.bPopulated = OMX_FALSE;
