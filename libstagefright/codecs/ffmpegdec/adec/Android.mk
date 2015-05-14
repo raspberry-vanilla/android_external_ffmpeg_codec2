@@ -30,7 +30,7 @@ LOCAL_SHARED_LIBRARIES := \
 LOCAL_MODULE := libstagefright_soft_ffmpegadec
 LOCAL_MODULE_TAGS := optional
 
-ifeq ($(TARGET_ARCH),arm)
+ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
     LOCAL_CFLAGS += -Wno-psabi
 endif
 
@@ -39,7 +39,7 @@ endif
 
 LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1
 
-#ifeq ($(TARGET_ARCH),arm)
+#ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
 #	LOCAL_CFLAGS += -fpermissive
 #endif
 
