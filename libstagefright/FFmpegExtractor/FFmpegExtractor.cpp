@@ -1494,6 +1494,7 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
 
     switch(codec_id) {
     //video
+    case AV_CODEC_ID_HEVC:
     case AV_CODEC_ID_H264:
     case AV_CODEC_ID_MPEG4:
     case AV_CODEC_ID_H263:
@@ -1538,6 +1539,7 @@ static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence)
 	//1. check codec id
 	codec_id = getCodecId(ic, AVMEDIA_TYPE_VIDEO);
 	if (codec_id != AV_CODEC_ID_NONE
+			&& codec_id != AV_CODEC_ID_HEVC
 			&& codec_id != AV_CODEC_ID_H264
 			&& codec_id != AV_CODEC_ID_MPEG4
 			&& codec_id != AV_CODEC_ID_H263
