@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Michael Chen <omxcodec@gmail.com>
+ * Copyright 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,12 +28,18 @@
 
 #include "utils/ffmpeg_utils.h"
 
+#include <OMX_AudioExt.h>
+#include <OMX_IndexExt.h>
+
 const int AVCODEC_MAX_AUDIO_FRAME_SIZE = 192000; // Deprecated in ffmpeg
 
 namespace android {
 
 struct SoftFFmpegAudio : public SimpleSoftOMXComponent {
     SoftFFmpegAudio(const char *name,
+            const char* componentRole,
+            OMX_AUDIO_CODINGTYPE codingType,
+            enum AVCodecID codecID,
             const OMX_CALLBACKTYPE *callbacks,
             OMX_PTR appData,
             OMX_COMPONENTTYPE **component);
@@ -54,7 +61,7 @@ protected:
     virtual void onQueueFilled(OMX_U32 portIndex);
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onPortEnableCompleted(OMX_U32 portIndex, bool enabled);
-
+    virtual void onReset();
 
 private:
     enum {
@@ -64,21 +71,6 @@ private:
         kNumOutputBuffers = 4,
         kOutputBufferSize = 9216 * 2
     };
-
-    enum {
-        MODE_NONE,
-        MODE_AAC,
-        MODE_MPEG,
-        MODE_VORBIS,
-        MODE_WMA,
-        MODE_RA,
-        MODE_FLAC,
-        MODE_MPEGL2,
-        MODE_AC3,
-        MODE_APE,
-        MODE_DTS,
-        MODE_TRIAL
-    } mMode;
 
     enum EOSStatus {
         INPUT_DATA_AVAILABLE,
@@ -98,6 +90,8 @@ private:
         ERR_RESAMPLE_FAILED     = -6
     };
 
+    const char* mRole;
+    OMX_AUDIO_CODINGTYPE mCodingType;
     bool mFFmpegAlreadyInited;
     bool mCodecAlreadyOpened;
     bool mExtradataReady;
@@ -152,7 +146,7 @@ private:
     bool isConfigured();
 
     void initPorts();
-    status_t initDecoder();
+    status_t initDecoder(enum AVCodecID codecID);
     void deInitDecoder();
 
     void    initVorbisHdr();

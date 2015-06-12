@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Michael Chen <omxcodec@gmail.com>
+ * Copyright 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +22,7 @@
 #include "SoftFFmpegVideo.h"
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 
@@ -33,78 +35,58 @@ static int decoder_reorder_pts = -1;
 
 namespace android {
 
-template<class T>
-static void InitOMXParams(T *params) {
-    params->nSize = sizeof(T);
-    params->nVersion.s.nVersionMajor = 1;
-    params->nVersion.s.nVersionMinor = 0;
-    params->nVersion.s.nRevision = 0;
-    params->nVersion.s.nStep = 0;
-}
-
-void SoftFFmpegVideo::setMode(const char *name) {
-    if (!strcmp(name, "OMX.ffmpeg.mpeg2.decoder")) {
-        mMode = MODE_MPEG2;
-    } else if (!strcmp(name, "OMX.ffmpeg.h263.decoder")) {
-        mMode = MODE_H263;
-	} else if (!strcmp(name, "OMX.ffmpeg.mpeg4.decoder")) {
-        mMode = MODE_MPEG4;
-    } else if (!strcmp(name, "OMX.ffmpeg.wmv.decoder")) {
-        mMode = MODE_WMV;
-    } else if (!strcmp(name, "OMX.ffmpeg.rv.decoder")) {
-        mMode = MODE_RV;
-	} else if (!strcmp(name, "OMX.ffmpeg.h264.decoder")) {
-        mMode = MODE_H264;
-    } else if (!strcmp(name, "OMX.ffmpeg.vp8.decoder")) {
-        mMode = MODE_VP8;
-    } else if (!strcmp(name, "OMX.ffmpeg.vp9.decoder")) {
-        mMode = MODE_VP9;
-    } else if (!strcmp(name, "OMX.ffmpeg.vc1.decoder")) {
-        mMode = MODE_VC1;
-    } else if (!strcmp(name, "OMX.ffmpeg.flv1.decoder")) {
-        mMode = MODE_FLV1;
-    } else if (!strcmp(name, "OMX.ffmpeg.divx.decoder")) {
-        mMode = MODE_DIVX;
-    } else if (!strcmp(name, "OMX.ffmpeg.hevc.decoder")) {
-        mMode = MODE_HEVC;
-    } else if (!strcmp(name, "OMX.ffmpeg.vtrial.decoder")) {
-        mMode = MODE_TRIAL;
-    } else {
-        TRESPASS();
-    }
-}
+static const struct VideoCodingMapEntry {
+    const char *mMime;
+    OMX_VIDEO_CODINGTYPE mVideoCodingType;
+    const char *mRole;
+    enum AVCodecID mCodecID;
+} kVideoCodingMapEntry[] = {
+    { "OMX.ffmpeg.h264.decoder", OMX_VIDEO_CodingAVC, "video_decoder.avc", AV_CODEC_ID_H264 },
+    { "OMX.ffmpeg.hevc.decoder", OMX_VIDEO_CodingHEVC, "video_decoder.hevc", AV_CODEC_ID_HEVC },
+    { "OMX.ffmpeg.mpeg4.decoder", OMX_VIDEO_CodingMPEG4, "video_decoder.mpeg4", AV_CODEC_ID_MPEG4 },
+    { "OMX.ffmpeg.h263.decoder", OMX_VIDEO_CodingH263, "video_decoder.h263", AV_CODEC_ID_H263 },
+    { "OMX.ffmpeg.mpeg2.decoder", OMX_VIDEO_CodingMPEG2, "video_decoder.mpeg2", AV_CODEC_ID_MPEG2VIDEO },
+    { "OMX.ffmpeg.vp8.decoder", OMX_VIDEO_CodingVP8, "video_decoder.vp8", AV_CODEC_ID_VP8 },
+    { "OMX.ffmpeg.vp9.decoder", OMX_VIDEO_CodingVP9, "video_decoder.vp9", AV_CODEC_ID_VP9 },
+    { "OMX.ffmpeg.wmv.decoder", OMX_VIDEO_CodingWMV, "video_decoder.wmv", AV_CODEC_ID_WMV2 },
+    { "OMX.ffmpeg.rv.decoder", OMX_VIDEO_CodingRV, "video_decoder.rv", AV_CODEC_ID_RV40 },
+    { "OMX.ffmpeg.flv1.decoder", OMX_VIDEO_CodingFLV1, "video_decoder.flv1", AV_CODEC_ID_FLV1 },
+    { "OMX.ffmpeg.divx.decoder", OMX_VIDEO_CodingDIVX, "video_decoder.divx", AV_CODEC_ID_MPEG4 },
+    { "OMX.ffmpeg.vc1.decoder", OMX_VIDEO_CodingVC1, "video_decoder.vc1", AV_CODEC_ID_VC1 },
+    { "OMX.ffmpeg.vtrial.decoder", OMX_VIDEO_CodingAutoDetect, "video_decoder.trial", AV_CODEC_ID_NONE },
+};
 
 SoftFFmpegVideo::SoftFFmpegVideo(
         const char *name,
+        const char *componentRole,
+        OMX_VIDEO_CODINGTYPE codingType,
         const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData,
-        OMX_COMPONENTTYPE **component)
-    : SimpleSoftOMXComponent(name, callbacks, appData, component),
-      mMode(MODE_NONE),
+        OMX_COMPONENTTYPE **component,
+        enum AVCodecID codecID)
+    : SoftVideoDecoderOMXComponent(name, componentRole, codingType,
+            NULL, 0, 320, 240, callbacks, appData, component),
+      mCodingType(codingType),
       mFFmpegAlreadyInited(false),
       mCodecAlreadyOpened(false),
-      mPendingSettingChangeEvent(false),
-      mPendingFrameAsSettingChanged(false),
       mCtx(NULL),
       mImgConvertCtx(NULL),
       mFrame(NULL),
       mEOSStatus(INPUT_DATA_AVAILABLE),
       mExtradataReady(false),
       mIgnoreExtradata(false),
-      mSignalledError(false),
-      mWidth(320),
-      mHeight(240),
       mStride(320),
-      mLastFrameDelay(0),
-      mLastPTS(0),
-      mOutputPortSettingsChange(NONE) {
+      mSignalledError(false) {
 
-    ALOGD("SoftFFmpegVideo component: %s mMode: %d appData: %p", name, mMode, appData);
+    ALOGD("SoftFFmpegVideo component: %s codingType=%d appData: %p", name, codingType, appData);
 
-    setMode(name);
+    initPorts(
+            kNumInputBuffers,
+            8192 /* inputBufferSize */,
+            kNumOutputBuffers,
+            name);
 
-    initPorts();
-    CHECK_EQ(initDecoder(), (status_t)OK);
+    CHECK_EQ(initDecoder(codecID), (status_t)OK);
 }
 
 SoftFFmpegVideo::~SoftFFmpegVideo() {
@@ -113,126 +95,6 @@ SoftFFmpegVideo::~SoftFFmpegVideo() {
     if (mFFmpegAlreadyInited) {
         deInitFFmpeg();
     }
-}
-
-void SoftFFmpegVideo::initInputFormat(uint32_t mode,
-        OMX_PARAM_PORTDEFINITIONTYPE &def) {
-    switch (mode) {
-    case MODE_MPEG2:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_MPEG2);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingMPEG2;
-        break;
-    case MODE_H263:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_H263);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingH263;
-        break;
-    case MODE_MPEG4:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_MPEG4);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingMPEG4;
-        break;
-    case MODE_WMV:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_WMV);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingWMV;
-        break;
-    case MODE_RV:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_RV);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingRV;
-        break;
-    case MODE_H264:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_AVC);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingAVC;
-        break;
-    case MODE_VP8:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_VP8);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingVP8;
-        break;
-    case MODE_VP9:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_VP9);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingVP9;
-        break;
-    case MODE_VC1:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_VC1);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingVC1;
-        break;
-    case MODE_FLV1:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_FLV1);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingFLV1;
-        break;
-    case MODE_DIVX:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_DIVX);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingDIVX;
-        break;
-    case MODE_HEVC:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_HEVC);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingHEVC;
-        break;
-    case MODE_TRIAL:
-        def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_FFMPEG);
-        def.format.video.eCompressionFormat = OMX_VIDEO_CodingAutoDetect;
-        break;
-    default:
-        CHECK(!"Should not be here. Unsupported mime type and compression format");
-        break;
-    }
-
-    def.format.video.pNativeRender = NULL;
-    def.format.video.nFrameWidth = mWidth;
-    def.format.video.nFrameHeight = mHeight;
-    def.format.video.nStride = def.format.video.nFrameWidth;
-    def.format.video.nSliceHeight = def.format.video.nFrameHeight;
-    def.format.video.nBitrate = 0;
-    def.format.video.xFramerate = 0;
-    def.format.video.bFlagErrorConcealment = OMX_FALSE;
-    def.format.video.eColorFormat = OMX_COLOR_FormatUnused;
-    def.format.video.pNativeWindow = NULL;
-}
-
-void SoftFFmpegVideo::initPorts() {
-    OMX_PARAM_PORTDEFINITIONTYPE def;
-    InitOMXParams(&def);
-
-    def.nPortIndex = 0;
-    def.eDir = OMX_DirInput;
-    def.nBufferCountMin = kNumInputBuffers;
-    def.nBufferCountActual = def.nBufferCountMin;
-    def.nBufferSize = 1280 * 720 * 3 / 2; // 256 * 1024?
-    def.bEnabled = OMX_TRUE;
-    def.bPopulated = OMX_FALSE;
-    def.eDomain = OMX_PortDomainVideo;
-    def.bBuffersContiguous = OMX_FALSE;
-    def.nBufferAlignment = 1;
-
-    initInputFormat(mMode, def);
-
-    addPort(def);
-
-    def.nPortIndex = 1;
-    def.eDir = OMX_DirOutput;
-    def.nBufferCountMin = kNumOutputBuffers;
-    def.nBufferCountActual = def.nBufferCountMin;
-    def.bEnabled = OMX_TRUE;
-    def.bPopulated = OMX_FALSE;
-    def.eDomain = OMX_PortDomainVideo;
-    def.bBuffersContiguous = OMX_FALSE;
-    def.nBufferAlignment = 2;
-
-    def.format.video.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_VIDEO_RAW);
-    def.format.video.pNativeRender = NULL;
-    def.format.video.nFrameWidth = mWidth;
-    def.format.video.nFrameHeight = mHeight;
-    def.format.video.nStride = def.format.video.nFrameWidth;
-    def.format.video.nSliceHeight = def.format.video.nFrameHeight;
-    def.format.video.nBitrate = 0;
-    def.format.video.xFramerate = 0;
-    def.format.video.bFlagErrorConcealment = OMX_FALSE;
-    def.format.video.eCompressionFormat = OMX_VIDEO_CodingUnused;
-    def.format.video.eColorFormat = OMX_COLOR_FormatYUV420Planar;
-    def.format.video.pNativeWindow = NULL;
-
-    def.nBufferSize =
-        (def.format.video.nFrameWidth * def.format.video.nFrameHeight * 3) / 2;
-
-    addPort(def);
 }
 
 void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec) {
@@ -258,9 +120,9 @@ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
         avctx->flags |= CODEC_FLAG_EMU_EDGE;
 }
 
-status_t SoftFFmpegVideo::initDecoder() {
+status_t SoftFFmpegVideo::initDecoder(enum AVCodecID codecID) {
     status_t status;
-    
+
     status = initFFmpeg();
     if (status != OK) {
         return NO_INIT;
@@ -275,59 +137,9 @@ status_t SoftFFmpegVideo::initDecoder() {
     }
 
     mCtx->codec_type = AVMEDIA_TYPE_VIDEO;
-    switch (mMode) {
-    case MODE_MPEG2:
-        mCtx->codec_id = AV_CODEC_ID_MPEG2VIDEO;
-        break;
-    case MODE_H263:
-        mCtx->codec_id = AV_CODEC_ID_H263;
-        //FIXME, which?
-        //mCtx->codec_id = AV_CODEC_ID_H263P;
-        //mCtx->codec_id = AV_CODEC_ID_H263I;
-        break;
-    case MODE_MPEG4:
-        mCtx->codec_id = AV_CODEC_ID_MPEG4;
-        break;
-    case MODE_WMV:
-        mCtx->codec_id = AV_CODEC_ID_WMV2;	// default, adjust in "internalSetParameter" fxn
-        break;
-    case MODE_RV:
-        mCtx->codec_id = AV_CODEC_ID_RV40;	// default, adjust in "internalSetParameter" fxn
-        break;
-    case MODE_H264:
-        mCtx->codec_id = AV_CODEC_ID_H264;
-        break;
-    case MODE_VP8:
-        mCtx->codec_id = AV_CODEC_ID_VP8;
-        break;
-    case MODE_VP9:
-        mCtx->codec_id = AV_CODEC_ID_VP9;
-        break;
-    case MODE_VC1:
-        mCtx->codec_id = AV_CODEC_ID_VC1;
-        break;
-    case MODE_FLV1:
-        mCtx->codec_id = AV_CODEC_ID_FLV1;
-        break;
-    case MODE_DIVX:
-        mCtx->codec_id = AV_CODEC_ID_MPEG4;
-        break;
-    case MODE_HEVC:
-        mCtx->codec_id = AV_CODEC_ID_HEVC;
-        break;
-    case MODE_TRIAL:
-        mCtx->codec_id = AV_CODEC_ID_NONE;
-        break;
-    default:
-        CHECK(!"Should not be here. Unsupported codec");
-        break;
-    }
-
+    mCtx->codec_id = codecID;
     mCtx->extradata_size = 0;
     mCtx->extradata = NULL;
-    mCtx->width = mWidth;
-    mCtx->height = mHeight;
-
     return OK;
 }
 
@@ -357,86 +169,10 @@ void SoftFFmpegVideo::deInitDecoder() {
     }
 }
 
-void SoftFFmpegVideo::getInputFormat(uint32_t mode,
-        OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams) {
-    switch (mode) {
-    case MODE_MPEG2:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingMPEG2;
-        break;
-    case MODE_H263:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingH263;
-        break;
-    case MODE_MPEG4:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingMPEG4;
-        break;
-    case MODE_WMV:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingWMV;
-        break;
-    case MODE_RV:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingRV;
-        break;
-    case MODE_H264:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingAVC;
-        break;
-    case MODE_VP8:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingVP8;
-        break;
-    case MODE_VP9:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingVP9;
-        break;
-    case MODE_VC1:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingVC1;
-        break;
-    case MODE_FLV1:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingFLV1;
-        break;
-    case MODE_DIVX:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingDIVX;
-        break;
-    case MODE_HEVC:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingHEVC;
-        break;
-    case MODE_TRIAL:
-        formatParams->eCompressionFormat = OMX_VIDEO_CodingAutoDetect;
-        break;
-    default:
-       CHECK(!"Should not be here. Unsupported compression format.");
-       break;
-    }
-    formatParams->eColorFormat = OMX_COLOR_FormatUnused;
-    formatParams->xFramerate = 0;
-}
-
 OMX_ERRORTYPE SoftFFmpegVideo::internalGetParameter(
         OMX_INDEXTYPE index, OMX_PTR params) {
     //ALOGV("internalGetParameter index:0x%x", index);
     switch (index) {
-        case OMX_IndexParamVideoPortFormat:
-        {
-            OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams =
-                (OMX_VIDEO_PARAM_PORTFORMATTYPE *)params;
-
-            if (formatParams->nPortIndex > kOutputPortIndex) {
-                return OMX_ErrorUndefined;
-            }
-
-            if (formatParams->nIndex != 0) {
-                return OMX_ErrorNoMore;
-            }
-
-            if (formatParams->nPortIndex == kInputPortIndex) {
-                getInputFormat(mMode, formatParams);
-            } else {
-                CHECK_EQ(formatParams->nPortIndex, kOutputPortIndex);
-
-                formatParams->eCompressionFormat = OMX_VIDEO_CodingUnused;
-                formatParams->eColorFormat = OMX_COLOR_FormatYUV420Planar;
-                formatParams->xFramerate = 0;
-            }
-
-            return OMX_ErrorNone;
-        }
-
         case OMX_IndexParamVideoWmv:
         {
             OMX_VIDEO_PARAM_WMVTYPE *profile =
@@ -482,91 +218,23 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalGetParameter(
         }
 
         default:
-
-            return SimpleSoftOMXComponent::internalGetParameter(index, params);
+            return SoftVideoDecoderOMXComponent::internalGetParameter(index, params);
     }
 }
 
 OMX_ERRORTYPE SoftFFmpegVideo::isRoleSupported(
 		        const OMX_PARAM_COMPONENTROLETYPE *roleParams) {
-    bool supported = true;
-
-    switch (mMode) {
-    case MODE_MPEG2:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.mpeg2", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_H263:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.h263", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_MPEG4:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.mpeg4", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_WMV:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.wmv", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_RV:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.rv", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_H264:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.avc", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_VP8:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.vp8", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_VP9:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.vp9", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_VC1:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.vc1", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_FLV1:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.flv1", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_DIVX:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.divx", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_HEVC:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.hevc", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    case MODE_TRIAL:
-        if (strncmp((const char *)roleParams->cRole,
-                "video_decoder.trial", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-            break;
-    default:
-        CHECK(!"Should not be here. Unsupported role.");
-        break;
+    for (size_t i = 0;
+         i < sizeof(kVideoCodingMapEntry) / sizeof(kVideoCodingMapEntry[0]);
+         ++i) {
+        if (mCodingType == kVideoCodingMapEntry[i].mVideoCodingType &&
+            strncmp((const char *)roleParams->cRole,
+                kVideoCodingMapEntry[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
+            return OMX_ErrorNone;
+        }
     }
-
-    if (!supported) {
-        ALOGE("unsupported role: %s", (const char *)roleParams->cRole);
-        return OMX_ErrorUndefined;
-    }
-    return OMX_ErrorNone;
+    ALOGE("unsupported role: %s", (const char *)roleParams->cRole);
+    return OMX_ErrorUndefined;
 }
 
 OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
@@ -580,45 +248,41 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
             return isRoleSupported(roleParams);
         }
 
-        case OMX_IndexParamVideoPortFormat:
-        {
-            OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams =
-                (OMX_VIDEO_PARAM_PORTFORMATTYPE *)params;
-
-            if (formatParams->nPortIndex > kOutputPortIndex) {
-                return OMX_ErrorUndefined;
-            }
-
-            if (formatParams->nIndex != 0) {
-                return OMX_ErrorNoMore;
-            }
-
-            return OMX_ErrorNone;
-        }
-
         case OMX_IndexParamPortDefinition:
         {
-            OMX_PARAM_PORTDEFINITIONTYPE *defParams =
+            OMX_PARAM_PORTDEFINITIONTYPE *newParams =
                 (OMX_PARAM_PORTDEFINITIONTYPE *)params;
+            OMX_VIDEO_PORTDEFINITIONTYPE *video_def = &newParams->format.video;
+            OMX_PARAM_PORTDEFINITIONTYPE *def = &editPortInfo(newParams->nPortIndex)->mDef;
 
-            if (defParams->nPortIndex > kOutputPortIndex ||
-                    defParams->nSize != sizeof(OMX_PARAM_PORTDEFINITIONTYPE)) {
-                return OMX_ErrorUndefined;
+            uint32_t oldWidth = def->format.video.nFrameWidth;
+            uint32_t oldHeight = def->format.video.nFrameHeight;
+            uint32_t newWidth = video_def->nFrameWidth;
+            uint32_t newHeight = video_def->nFrameHeight;
+            if (newWidth != oldWidth || newHeight != oldHeight) {
+                bool outputPort = (newParams->nPortIndex == kOutputPortIndex);
+                if (outputPort) {
+                    ALOGV("OMX_IndexParamPortDefinition (output) width=%d height=%d", newWidth, newHeight);
+
+                    // only update (essentially crop) if size changes
+                    mWidth = newWidth;
+                    mHeight = newHeight;
+
+                    updatePortDefinitions(true, true);
+                    // reset buffer size based on frame size
+                    newParams->nBufferSize = def->nBufferSize;
+                } else {
+                    // For input port, we only set nFrameWidth and nFrameHeight. Buffer size
+                    // is updated when configuring the output port using the max-frame-size,
+                    // though client can still request a larger size.
+                    ALOGV("OMX_IndexParamPortDefinition (input) width=%d height=%d", newWidth, newHeight);
+                    def->format.video.nFrameWidth = newWidth;
+                    def->format.video.nFrameHeight = newHeight;
+                    mCtx->width = newWidth;
+                    mCtx->height = newHeight;
+                }
             }
-
-            CHECK_EQ((int)defParams->eDomain, (int)OMX_PortDomainVideo);
-
-            //only care about input port
-            if (defParams->nPortIndex == kOutputPortIndex) {
-                OMX_VIDEO_PORTDEFINITIONTYPE *video_def = &defParams->format.video;
-                mCtx->width = video_def->nFrameWidth;
-                mCtx->height = video_def->nFrameHeight;
-                ALOGV("got OMX_IndexParamPortDefinition, width: %lu, height: %lu",
-                        video_def->nFrameWidth, video_def->nFrameHeight);
-                return OMX_ErrorNone;
-            }
-
-            return OMX_ErrorNone;
+            return SoftVideoDecoderOMXComponent::internalSetParameter(index, params);
         }
 
         case OMX_IndexParamVideoWmv:
@@ -637,8 +301,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
             } else if (profile->eFormat == OMX_VIDEO_WMVFormat9) {
                 mCtx->codec_id = AV_CODEC_ID_WMV3;
             } else {
-                ALOGE("unsupported wmv codec: 0x%x", profile->eFormat);
-                return OMX_ErrorUndefined;
+                mCtx->codec_id = AV_CODEC_ID_VC1;
             }
 
             return OMX_ErrorNone;
@@ -692,30 +355,8 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
 
         default:
 
-            return SimpleSoftOMXComponent::internalSetParameter(index, params);
+            return SoftVideoDecoderOMXComponent::internalSetParameter(index, params);
     }
-}
-
-bool SoftFFmpegVideo::isPortSettingChanged() {
-    return (mCtx->width != mWidth || mCtx->height != mHeight);
-}
-
-bool SoftFFmpegVideo::handlePortSettingChangeEvent() {
-    if (mCtx->width != mWidth || mCtx->height != mHeight) {
-       ALOGI("ffmpeg video port setting change event(%dx%d)->(%dx%d).",
-               mWidth, mHeight, mCtx->width, mCtx->height);
-
-       mWidth = mCtx->width;
-       mHeight = mCtx->height;
-       mStride = mWidth;
-
-       updatePortDefinitions();
-       notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
-       mOutputPortSettingsChange = AWAITING_DISABLED;
-       return true;
-    }
-
-    return false;
 }
 
 int32_t SoftFFmpegVideo::handleExtradata() {
@@ -852,8 +493,6 @@ int32_t SoftFFmpegVideo::decodeVideo() {
         //don't send error to OMXCodec, skip!
         ret = ERR_NO_FRM;
     } else {
-        mPendingSettingChangeEvent = isPortSettingChanged();
-
         if (!gotPic) {
             ALOGI("ffmpeg video decoder failed to get frame.");
             //stop sending empty packets if the decoder is finished
@@ -863,9 +502,6 @@ int32_t SoftFFmpegVideo::decodeVideo() {
                 ret = ERR_NO_FRM;
             }
         } else {
-            if (mPendingSettingChangeEvent) {
-                mPendingFrameAsSettingChanged = true;
-            }
 			ret = ERR_OK;
         }
     }
@@ -890,15 +526,15 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
 
     memset(&pict, 0, sizeof(AVPicture));
     pict.data[0] = dst;
-    pict.data[1] = dst + mStride * mHeight;
-    pict.data[2] = pict.data[1] + (mStride / 2  * mHeight / 2);
-    pict.linesize[0] = mStride;
-    pict.linesize[1] = mStride / 2;
-    pict.linesize[2] = mStride / 2;
+    pict.data[1] = dst + mWidth * mHeight;
+    pict.data[2] = pict.data[1] + (mWidth / 2  * mHeight / 2);
+    pict.linesize[0] = mWidth;
+    pict.linesize[1] = mWidth / 2;
+    pict.linesize[2] = mWidth / 2;
 
     int sws_flags = SWS_BICUBIC;
     mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
-           mWidth, mHeight, (AVPixelFormat)mFrame->format, mWidth, mHeight,
+           mCtx->width, mCtx->height, (AVPixelFormat)mFrame->format, mWidth, mHeight,
            PIX_FMT_YUV420P, sws_flags, NULL, NULL, NULL);
     if (mImgConvertCtx == NULL) {
         ALOGE("Cannot initialize the conversion context");
@@ -908,7 +544,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
             0, mHeight, pict.data, pict.linesize);
 
     outHeader->nOffset = 0;
-    outHeader->nFilledLen = (mStride * mHeight * 3) / 2;
+    outHeader->nFilledLen = (mWidth * mHeight * 3) / 2;
     outHeader->nFlags = 0;
     if (mFrame->key_frame) {
         outHeader->nFlags |= OMX_BUFFERFLAG_SYNCFRAME;
@@ -944,6 +580,7 @@ void SoftFFmpegVideo::drainEOSOutputBuffer() {
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
     BufferInfo *outInfo = *outQueue.begin();
     CHECK(outInfo != NULL);
+    outQueue.erase(outQueue.begin());
     OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
     ALOGD("ffmpeg video decoder fill eos outbuf");
@@ -952,7 +589,6 @@ void SoftFFmpegVideo::drainEOSOutputBuffer() {
     outHeader->nFilledLen = 0;
     outHeader->nFlags = OMX_BUFFERFLAG_EOS;
 
-    outQueue.erase(outQueue.begin());
     outInfo->mOwnedByUs = false;
     notifyFillBufferDone(outHeader);
 
@@ -974,41 +610,26 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
     }
 
     while (!outQueue.empty()) {
-        if (!mPendingFrameAsSettingChanged) {
-            int32_t err = decodeVideo();
-		    if (err < ERR_OK) {
-                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-                mSignalledError = true;
-                return;
-            } else if (err == ERR_FLUSHED) {
-                drainEOSOutputBuffer();
-                return;
-            } else {
-                CHECK_EQ(err, ERR_OK);
-                if (mPendingSettingChangeEvent) {
-                    return;
-                }
-            }
-		}
-
+        int32_t err = decodeVideo();
+        if (err < ERR_OK) {
+            notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+            mSignalledError = true;
+            return;
+        } else if (err == ERR_FLUSHED) {
+            drainEOSOutputBuffer();
+            return;
+        } else {
+            CHECK_EQ(err, ERR_OK);
+        }
         if (drainOneOutputBuffer() != ERR_OK) {
             notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
             mSignalledError = true;
             return;
 		}
-		
-        if (mPendingFrameAsSettingChanged) {
-            mPendingFrameAsSettingChanged = false;
-        }
     }
 }
 
 void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
-    BufferInfo *inInfo = NULL;
-    OMX_BUFFERHEADERTYPE *inHeader = NULL;
-    List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
-    List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
-
     if (mSignalledError || mOutputPortSettingsChange != NONE) {
         return;
     }
@@ -1017,46 +638,37 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
         return;
     }
 
+    List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
+    List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
+
     while (((mEOSStatus != INPUT_DATA_AVAILABLE) || !inQueue.empty())
             && !outQueue.empty()) {
-        if (mPendingSettingChangeEvent) {
-            //fix crash! We don't notify event until wait for all output buffers
-            if (outQueue.size() == kNumOutputBuffers) {
-                CHECK(handlePortSettingChangeEvent() == true);
-                mPendingSettingChangeEvent = false;
-            }
-            return;
-        }
 
         if (mEOSStatus == INPUT_EOS_SEEN) {
             drainAllOutputBuffers();
-            continue;
+            return;
         }
 
-        inInfo   = *inQueue.begin();
+        BufferInfo *inInfo = *inQueue.begin();
         if (inInfo == NULL) {
             continue;
         }
-        inHeader = inInfo->mHeader;
+        OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
         if (inHeader == NULL) {
             continue;
         }
 
-        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
-            ALOGD("ffmpeg video decoder empty eos inbuf");
-            inQueue.erase(inQueue.begin());
-            inInfo->mOwnedByUs = false;
-            notifyEmptyBufferDone(inHeader);
-            mEOSStatus = INPUT_EOS_SEEN;
-			continue;
-        }
-
         if (inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
+            ALOGD("ffmpeg got codecconfig buffer");
             if (handleExtradata() != ERR_OK) {
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
             }
             continue;
+        }
+
+        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+            mEOSStatus = INPUT_EOS_SEEN;
         }
 
         if (!mCodecAlreadyOpened) {
@@ -1067,37 +679,37 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
             }
         }
 
-        if (!mPendingFrameAsSettingChanged) {
-            int32_t err = decodeVideo();
-		    if (err < ERR_OK) {
-                notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
-                mSignalledError = true;
-                return;
-            } else if (err == ERR_NO_FRM) {
-                continue;
-            } else {
-                CHECK_EQ(err, ERR_OK);
-                if (mPendingSettingChangeEvent) {
-                    continue;
-                }
-            }
-		}
+        int32_t err = decodeVideo();
+        if (err < ERR_OK) {
+            notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
+            mSignalledError = true;
+            return;
+        } else if (err == ERR_FLUSHED) {
+            drainEOSOutputBuffer();
+            return;
+        } else if (err == ERR_NO_FRM) {
+            continue;
+        } else {
+            CHECK_EQ(err, ERR_OK);
+        }
+
+        bool portWillReset = false;
+        handlePortSettingsChange(&portWillReset, mCtx->width, mCtx->height);
+        if (portWillReset) {
+            return;
+        }
 
         if (drainOneOutputBuffer() != ERR_OK) {
             notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
             mSignalledError = true;
             return;
 		}
-		
-        if (mPendingFrameAsSettingChanged) {
-            mPendingFrameAsSettingChanged = false;
-        }
     }
 }
 
 void SoftFFmpegVideo::onPortFlushCompleted(OMX_U32 portIndex) {
     ALOGV("ffmpeg video decoder flush port(%lu)", portIndex);
-    if (portIndex == kInputPortIndex && mCtx) {
+    if (portIndex == kInputPortIndex) {
         if (mCtx) {
             //Make sure that the next buffer output does not still
             //depend on fragments from the last one decoded.
@@ -1107,56 +719,13 @@ void SoftFFmpegVideo::onPortFlushCompleted(OMX_U32 portIndex) {
     }
 }
 
-void SoftFFmpegVideo::onPortEnableCompleted(OMX_U32 portIndex, bool enabled) {
-    if (portIndex != kOutputPortIndex) {
-        return;
-    }
-
-    switch (mOutputPortSettingsChange) {
-        case NONE:
-            break;
-
-        case AWAITING_DISABLED:
-        {
-            CHECK(!enabled);
-            mOutputPortSettingsChange = AWAITING_ENABLED;
-            break;
-        }
-
-        default:
-        {
-            CHECK_EQ((int)mOutputPortSettingsChange, (int)AWAITING_ENABLED);
-            CHECK(enabled);
-            mOutputPortSettingsChange = NONE;
-            break;
-        }
-    }
-}
-
-void SoftFFmpegVideo::updatePortDefinitions() {
-    OMX_PARAM_PORTDEFINITIONTYPE *def = &editPortInfo(0)->mDef;
-    def->format.video.nFrameWidth = mWidth;
-    def->format.video.nFrameHeight = mHeight;
-    def->format.video.nStride = def->format.video.nFrameWidth;
-    def->format.video.nSliceHeight = def->format.video.nFrameHeight;
-    def->nBufferSize =
-        (def->format.video.nFrameWidth
-            * def->format.video.nFrameHeight * 3) / 2;
-
-    def = &editPortInfo(1)->mDef;
-    def->format.video.nFrameWidth = mWidth;
-    def->format.video.nFrameHeight = mHeight;
-    def->format.video.nStride = def->format.video.nFrameWidth;
-    def->format.video.nSliceHeight = def->format.video.nFrameHeight;
-#if 0
-    def->nBufferSize =
-        (def->format.video.nFrameWidth
-            * def->format.video.nFrameHeight * 3) / 2;
-#else
-    def->nBufferSize =
-        (((def->format.video.nFrameWidth + 15) & -16)
-            * ((def->format.video.nFrameHeight + 15) & -16) * 3) / 2;
-#endif
+void SoftFFmpegVideo::onReset() {
+    SoftVideoDecoderOMXComponent::onReset();
+    mFFmpegAlreadyInited = false;
+    mCodecAlreadyOpened = false;
+    mCtx = NULL;
+    mSignalledError = false;
+    mExtradataReady = false;
 }
 
 }  // namespace android
@@ -1164,6 +733,27 @@ void SoftFFmpegVideo::updatePortDefinitions() {
 android::SoftOMXComponent *createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
-    return new android::SoftFFmpegVideo(name, callbacks, appData, component);
+
+    OMX_VIDEO_CODINGTYPE codingType = OMX_VIDEO_CodingAutoDetect;
+    char *componentRole = NULL;
+    enum AVCodecID codecID = AV_CODEC_ID_NONE;
+
+    for (size_t i = 0;
+         i < sizeof(android::kVideoCodingMapEntry) / sizeof(android::kVideoCodingMapEntry[0]);
+         ++i) {
+        if (!strcasecmp(name, android::kVideoCodingMapEntry[i].mMime)) {
+            componentRole = strdup(android::kVideoCodingMapEntry[i].mRole);
+            codingType = android::kVideoCodingMapEntry[i].mVideoCodingType;
+            codecID = android::kVideoCodingMapEntry[i].mCodecID;
+            break;
+        }
+    }
+
+    if (componentRole == NULL) {
+        TRESPASS();
+    }
+
+    return new android::SoftFFmpegVideo(name, componentRole, codingType,
+                                        callbacks, appData, component, codecID);
 }
 

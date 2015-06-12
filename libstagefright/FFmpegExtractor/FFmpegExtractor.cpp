@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Michael Chen <omxcodec@gmail.com>
+ * Copyright 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -479,6 +480,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
                 avctx->codec_id, avcodec_get_name(avctx->codec_id));
         meta = new MetaData;
         meta->setInt32(kKeyCodecId, avctx->codec_id);
+        meta->setInt32(kKeyCodedSampleBits, avctx->bits_per_coded_sample);
         meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FFMPEG);
         if (avctx->extradata_size > 0) {
             meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
@@ -798,10 +800,10 @@ void FFmpegExtractor::setFFmpegDefaultOpts()
     mAudioDisable = 0;
 #endif
     mShowStatus   = 0;
-    mSeekByBytes  = 0; /* seek by bytes 0=off 1=on -1=auto" */
+    mSeekByBytes  = -1; /* seek by bytes 0=off 1=on -1=auto" */
     mDuration     = AV_NOPTS_VALUE;
     mSeekPos      = AV_NOPTS_VALUE;
-    mAutoExit     = 1;
+    mAutoExit     = 0;
     mLoop         = 1;
 
     mVideoStreamIdx = -1;

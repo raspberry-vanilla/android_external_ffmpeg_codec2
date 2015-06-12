@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Michael Chen <omxcodec@gmail.com>
+ * Copyright 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -43,44 +44,38 @@ static void InitOMXParams(T *params) {
     params->nVersion.s.nStep = 0;
 }
 
-void SoftFFmpegAudio::setMode(const char *name) {
-    if (!strcmp(name, "OMX.ffmpeg.aac.decoder")) {
-        mMode = MODE_AAC;
-	} else if (!strcmp(name, "OMX.ffmpeg.mp3.decoder")) {
-        mMode = MODE_MPEG;
-        mIgnoreExtradata = true;
-    } else if (!strcmp(name, "OMX.ffmpeg.vorbis.decoder")) {
-        mMode = MODE_VORBIS;
-    } else if (!strcmp(name, "OMX.ffmpeg.wma.decoder")) {
-        mMode = MODE_WMA;
-    } else if (!strcmp(name, "OMX.ffmpeg.ra.decoder")) {
-        mMode = MODE_RA;
-    } else if (!strcmp(name, "OMX.ffmpeg.flac.decoder")) {
-        mMode = MODE_FLAC;
-    } else if (!strcmp(name, "OMX.ffmpeg.mp2.decoder")) {
-        mMode = MODE_MPEGL2;
-    } else if (!strcmp(name, "OMX.ffmpeg.ac3.decoder")) {
-        mMode = MODE_AC3;
-    } else if (!strcmp(name, "OMX.ffmpeg.ape.decoder")) {
-        mMode = MODE_APE;
-    } else if (!strcmp(name, "OMX.ffmpeg.dts.decoder")) {
-        mMode = MODE_DTS;
-    } else if (!strcmp(name, "OMX.ffmpeg.atrial.decoder")) {
-        mMode = MODE_TRIAL;
-    } else {
-        TRESPASS();
-    }
-}
+static const struct AudioCodingMapEntry {
+    const char *mComponent;
+    OMX_AUDIO_CODINGTYPE mAudioCodingType;
+    const char *mRole;
+    enum AVCodecID mCodecID;
+} kAudioCodingMapEntry[] = {
+    { "OMX.ffmpeg.aac.decoder", OMX_AUDIO_CodingAAC, "audio_decoder.aac", AV_CODEC_ID_AAC },
+    { "OMX.ffmpeg.mp3.decoder", OMX_AUDIO_CodingMP3, "audio_decoder.mp3", AV_CODEC_ID_MP3 },
+    { "OMX.ffmpeg.vorbis.decoder", OMX_AUDIO_CodingVORBIS, "audio_decoder.vorbis", AV_CODEC_ID_VORBIS },
+    { "OMX.ffmpeg.wma.decoder", OMX_AUDIO_CodingWMA, "audio_decoder.wma", AV_CODEC_ID_WMAV2 },
+    { "OMX.ffmpeg.flac.decoder", OMX_AUDIO_CodingFLAC, "audio_decoder.flac", AV_CODEC_ID_FLAC },
+    { "OMX.ffmpeg.mp2.decoder", OMX_AUDIO_CodingMP2, "audio_decoder.mp2", AV_CODEC_ID_MP2 },
+    { "OMX.ffmpeg.ac3.decoder", OMX_AUDIO_CodingAC3, "audio_decoder.ac3", AV_CODEC_ID_AC3 },
+    { "OMX.ffmpeg.ape.decoder", OMX_AUDIO_CodingAPE, "audio_decoder.ape", AV_CODEC_ID_APE },
+    { "OMX.ffmpeg.dts.decoder", OMX_AUDIO_CodingDTS, "audio_decoder.dts", AV_CODEC_ID_DTS },
+    { "OMX.ffmpeg.ra.decoder", OMX_AUDIO_CodingRA, "audio_decoder.ra", AV_CODEC_ID_COOK },
+    { "OMX.ffmpeg.atrial.decoder", OMX_AUDIO_CodingAutoDetect, "audio_decoder.trial", AV_CODEC_ID_NONE }
+};
 
 int64_t *SoftFFmpegAudio::sAudioClock;
 
 SoftFFmpegAudio::SoftFFmpegAudio(
         const char *name,
+        const char *componentRole,
+        OMX_AUDIO_CODINGTYPE codingType,
+        enum AVCodecID codecID,
         const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData,
         OMX_COMPONENTTYPE **component)
     : SimpleSoftOMXComponent(name, callbacks, appData, component),
-      mMode(MODE_NONE),
+      mRole(componentRole),
+      mCodingType(codingType),
       mFFmpegAlreadyInited(false),
       mCodecAlreadyOpened(false),
       mExtradataReady(false),
@@ -96,19 +91,17 @@ SoftFFmpegAudio::SoftFFmpegAudio(
       mOutputPortSettingsChange(NONE),
       mReconfiguring(false) {
 
-    setMode(name);
-
     setAudioClock(0);
 
     char value[PROPERTY_VALUE_MAX] = {0};
     property_get("audio.offload.24bit.enable", value, "1");
     mHighResAudioEnabled = atoi(value);
 
-    ALOGD("SoftFFmpegAudio component: %s mMode: %d mHighResAudioEnabled: %d",
-            name, mMode, mHighResAudioEnabled);
+    ALOGD("SoftFFmpegAudio component: %s mCodingType: %d mHighResAudioEnabled: %d",
+            name, mCodingType, mHighResAudioEnabled);
 
     initPorts();
-    CHECK_EQ(initDecoder(), (status_t)OK);
+    CHECK_EQ(initDecoder(codecID), (status_t)OK);
 }
 
 SoftFFmpegAudio::~SoftFFmpegAudio() {
@@ -117,62 +110,6 @@ SoftFFmpegAudio::~SoftFFmpegAudio() {
     if (mFFmpegAlreadyInited) {
         deInitFFmpeg();
     }
-}
-
-void SoftFFmpegAudio::initInputFormat(uint32_t mode,
-        OMX_PARAM_PORTDEFINITIONTYPE &def) {
-    switch (mode) {
-    case MODE_AAC:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_AAC);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingAAC;
-        break;
-    case MODE_MPEG:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_MPEG);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingMP3;
-        break;
-    case MODE_VORBIS:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_VORBIS);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingVORBIS;
-        break;
-    case MODE_WMA:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_WMA);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingWMA;
-        break;
-    case MODE_RA:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_RA);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingRA;
-        break;
-    case MODE_FLAC:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_FLAC);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingFLAC;
-        break;
-    case MODE_MPEGL2:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingMP2;
-        break;
-    case MODE_AC3:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_AC3);
-        def.format.audio.eEncoding = (OMX_AUDIO_CODINGTYPE)OMX_AUDIO_CodingAndroidAC3;
-        break;
-    case MODE_APE:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_APE);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingAPE;
-        break;
-    case MODE_DTS:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_DTS);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingDTS;
-        break;
-    case MODE_TRIAL:
-        def.format.audio.cMIMEType = const_cast<char *>(MEDIA_MIMETYPE_AUDIO_FFMPEG);
-        def.format.audio.eEncoding = OMX_AUDIO_CodingAutoDetect;
-        break;
-    default:
-        CHECK(!"Should not be here. Unsupported mime type and compression format");
-        break;
-    }
-
-    def.format.audio.pNativeRender = NULL;
-    def.format.audio.bFlagErrorConcealment = OMX_FALSE;
 }
 
 void SoftFFmpegAudio::initPorts() {
@@ -184,9 +121,9 @@ void SoftFFmpegAudio::initPorts() {
     def.nBufferCountMin = kNumInputBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
 
-    if (mMode == MODE_APE) {
+    if (mCodingType == OMX_AUDIO_CodingAPE) {
         def.nBufferSize = 1000000; // ape!
-    } else if (mMode == MODE_DTS) {
+    } else if (mCodingType == OMX_AUDIO_CodingDTS) {
         def.nBufferSize = 1000000; // dts!
     } else {
         // max aggregated buffer size from nuplayer
@@ -199,7 +136,10 @@ void SoftFFmpegAudio::initPorts() {
     def.bBuffersContiguous = OMX_FALSE;
     def.nBufferAlignment = 1;
 
-    initInputFormat(mMode, def);
+    //def.format.audio.cMIMEType = const_cast<char *>("audio/raw");
+    def.format.audio.pNativeRender = NULL;
+    def.format.audio.bFlagErrorConcealment = OMX_FALSE;
+    def.format.audio.eEncoding = mCodingType;
 
     addPort(def);
 
@@ -281,7 +221,7 @@ void SoftFFmpegAudio::deinitVorbisHdr() {
     }
 }
 
-status_t SoftFFmpegAudio::initDecoder() {
+status_t SoftFFmpegAudio::initDecoder(enum AVCodecID codecID) {
     status_t status;
 
     status = initFFmpeg();
@@ -297,44 +237,7 @@ status_t SoftFFmpegAudio::initDecoder() {
     }
 
     mCtx->codec_type = AVMEDIA_TYPE_AUDIO;
-    switch (mMode) {
-    case MODE_AAC:
-        mCtx->codec_id = AV_CODEC_ID_AAC;
-        break;
-    case MODE_MPEG:
-        mCtx->codec_id = AV_CODEC_ID_MP3;
-        break;
-    case MODE_VORBIS:
-        mCtx->codec_id = AV_CODEC_ID_VORBIS;
-        break;
-    case MODE_WMA:
-        mCtx->codec_id = AV_CODEC_ID_WMAV2; //should be adjusted later
-        break;
-    case MODE_RA:
-        mCtx->codec_id = AV_CODEC_ID_COOK;
-        break;
-    case MODE_FLAC:
-        mCtx->codec_id = AV_CODEC_ID_FLAC;
-        break;
-    case MODE_MPEGL2:
-        mCtx->codec_id = AV_CODEC_ID_MP2;
-        break;
-    case MODE_AC3:
-        mCtx->codec_id = AV_CODEC_ID_AC3;
-        break;
-    case MODE_APE:
-        mCtx->codec_id = AV_CODEC_ID_APE;
-        break;
-    case MODE_DTS:
-        mCtx->codec_id = AV_CODEC_ID_DTS;
-        break;
-    case MODE_TRIAL:
-        mCtx->codec_id = AV_CODEC_ID_NONE;
-        break;
-    default:
-        CHECK(!"Should not be here. Unsupported codec");
-        break;
-    }
+    mCtx->codec_id = codecID;
 
     //invalid ctx
     resetCtx();
@@ -640,75 +543,17 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
 OMX_ERRORTYPE SoftFFmpegAudio::isRoleSupported(
         const OMX_PARAM_COMPONENTROLETYPE *roleParams) {
-    bool supported = true;
-
-    switch (mMode) {
-    case MODE_AAC:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.aac", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_MPEG:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.mp3", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-        break;
-    case MODE_VORBIS:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.vorbis", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_WMA:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.wma", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_RA:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.ra", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_FLAC:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.flac", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_MPEGL2:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.mp2", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-        break;
-    case MODE_AC3:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.ac3", OMX_MAX_STRINGNAME_SIZE - 1))
-            supported = false;
-        break;
-    case MODE_APE:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.ape", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_DTS:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.dts", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    case MODE_TRIAL:
-        if (strncmp((const char *)roleParams->cRole,
-                "audio_decoder.trial", OMX_MAX_STRINGNAME_SIZE - 1))
-        supported = false;
-        break;
-    default:
-        CHECK(!"Should not be here. Unsupported role.");
-        break;
+    for (size_t i = 0;
+         i < sizeof(kAudioCodingMapEntry) / sizeof(kAudioCodingMapEntry[0]);
+         ++i) {
+        if (mCodingType == kAudioCodingMapEntry[i].mAudioCodingType &&
+            strncmp((const char *)roleParams->cRole,
+                kAudioCodingMapEntry[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
+            return OMX_ErrorNone;
+        }
     }
-
-    if (!supported) {
-        ALOGE("unsupported role: %s", (const char *)roleParams->cRole);
-        return OMX_ErrorUndefined;
-    }
-
-    return OMX_ErrorNone;
+    ALOGE("unsupported role: %s", (const char *)roleParams->cRole);
+    return OMX_ErrorUndefined;
 }
 
 void SoftFFmpegAudio::adjustAudioParams() {
@@ -1039,6 +884,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
             mCtx->bit_rate = profile->nBitRate;
             mCtx->sample_rate = profile->nSampleRate;
             mCtx->block_align = profile->nBlockAlign;
+            mCtx->bits_per_coded_sample = profile->nBitsPerSample;
             mCtx->sample_fmt = (AVSampleFormat)profile->eSampleFormat;
 
             adjustAudioParams();
@@ -1337,7 +1183,7 @@ int32_t SoftFFmpegAudio::resampleAudio() {
     if ((mReconfiguring && mSwrCtx) || (!mSwrCtx
             && (mFrame->format != mAudioSrcFmt
                 || channelLayout != mAudioSrcChannelLayout
-                || mFrame->sample_rate != mAudioSrcFreq
+                || (unsigned int)mFrame->sample_rate != mAudioSrcFreq
                 || mAudioSrcFmt != mAudioTgtFmt
                 || mAudioSrcChannelLayout != mAudioTgtChannelLayout
                 || mAudioSrcFreq != mAudioTgtFreq))) {
@@ -1663,10 +1509,34 @@ void SoftFFmpegAudio::setAudioClock(int64_t ticks) {
     *sAudioClock = ticks;
 }
 
+void SoftFFmpegAudio::onReset() {
+    enum AVCodecID codecID = mCtx->codec_id;
+    deInitDecoder();
+    initDecoder(codecID);
+    mSignalledError = false;
+    mOutputPortSettingsChange = NONE;
+}
+
 }  // namespace android
 
 android::SoftOMXComponent *createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
-    return new android::SoftFFmpegAudio(name, callbacks, appData, component);
+    OMX_AUDIO_CODINGTYPE codingType = OMX_AUDIO_CodingAutoDetect;
+    char *componentRole = NULL;
+    enum AVCodecID codecID = AV_CODEC_ID_NONE;
+
+    for (size_t i = 0;
+            i < sizeof(android::kAudioCodingMapEntry) / sizeof(android::kAudioCodingMapEntry[0]);
+            ++i) {
+        if (!strcasecmp(name, android::kAudioCodingMapEntry[i].mComponent)) {
+            componentRole = strdup(android::kAudioCodingMapEntry[i].mRole);
+            codingType = android::kAudioCodingMapEntry[i].mAudioCodingType;
+            codecID = android::kAudioCodingMapEntry[i].mCodecID;
+            break;
+         }
+     }
+
+    return new android::SoftFFmpegAudio(name, componentRole, codingType, codecID,
+            callbacks, appData, component);
 }
