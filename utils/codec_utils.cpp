@@ -329,7 +329,7 @@ sp<MetaData> setVORBISFormat(AVCodecContext *avctx)
 {
     ALOGV("VORBIS");
 
-    uint8_t *header_start[3];
+    const uint8_t *header_start[3];
     int header_len[3];
     if (avpriv_split_xiph_headers(avctx->extradata,
                 avctx->extradata_size, 30,
