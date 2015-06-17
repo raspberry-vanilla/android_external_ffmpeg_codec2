@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2008 The Android Open Source Project
+# Copyright (C) 2015 The CyanogenMod Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,4 +15,13 @@
 # limitations under the License.
 #
 
+LOCAL_PATH := $(call my-dir)
+
 include $(call all-subdir-makefiles)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE		:= media_codecs_ffmpeg.xml
+LOCAL_MODULE_TAGS	:= optional
+LOCAL_MODULE_CLASS	:= ETC
+LOCAL_SRC_FILES		:= media_codecs_ffmpeg.xml
+include $(BUILD_PREBUILT)
