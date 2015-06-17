@@ -3,8 +3,6 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 include external/ffmpeg/android/ffmpeg.mk
 
-FFMPEG_SRC_DIR := $(TOP)/external/ffmpeg
-
 LOCAL_SRC_FILES := \
 	FFmpegExtractor.cpp
 
@@ -13,10 +11,6 @@ LOCAL_C_INCLUDES += \
 	$(TOP)/frameworks/native/include/media/openmax \
 	$(TOP)/frameworks/av/include \
 	$(TOP)/frameworks/av/media/libstagefright
-
-LOCAL_C_INCLUDES += \
-	$(FFMPEG_SRC_DIR) \
-	$(FFMPEG_SRC_DIR)/android/include
 
 LOCAL_SHARED_LIBRARIES := \
 	libutils          \

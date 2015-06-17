@@ -1,8 +1,7 @@
 LOCAL_PATH := $(call my-dir)
+
 include $(CLEAR_VARS)
 include external/ffmpeg/android/ffmpeg.mk
-
-FFMPEG_SRC_DIR := $(TOP)/external/ffmpeg
 
 LOCAL_SRC_FILES := \
 	SoftFFmpegVideo.cpp
@@ -10,12 +9,7 @@ LOCAL_SRC_FILES := \
 LOCAL_C_INCLUDES += \
 	$(LOCAL_PATH)/../../../.. \
 	$(TOP)/frameworks/av/media/libstagefright/include \
-	$(TOP)/frameworks/native/include/media/openmax \
-	$(TOP)/external/stagefright-plugins/libstagefright/codecs/ffmpegdec/adec
-
-LOCAL_C_INCLUDES += \
-	$(FFMPEG_SRC_DIR) \
-	$(FFMPEG_SRC_DIR)/android/include
+	$(TOP)/frameworks/native/include/media/openmax
 
 LOCAL_SHARED_LIBRARIES := \
 	libutils          \
