@@ -26,8 +26,6 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaDefs.h>
 
-#include "SoftFFmpegAudio.h"
-
 #define DEBUG_PKT 0
 #define DEBUG_FRM 0
 
@@ -53,6 +51,7 @@ static const struct VideoCodingMapEntry {
     { "OMX.ffmpeg.flv1.decoder", OMX_VIDEO_CodingFLV1, "video_decoder.flv1", AV_CODEC_ID_FLV1 },
     { "OMX.ffmpeg.divx.decoder", OMX_VIDEO_CodingDIVX, "video_decoder.divx", AV_CODEC_ID_MPEG4 },
     { "OMX.ffmpeg.vc1.decoder", OMX_VIDEO_CodingVC1, "video_decoder.vc1", AV_CODEC_ID_VC1 },
+    { "OMX.ffmpeg.wmv.decoder", OMX_VIDEO_CodingWMV, "video_decoder.vc1", AV_CODEC_ID_VC1 },
     { "OMX.ffmpeg.vtrial.decoder", OMX_VIDEO_CodingAutoDetect, "video_decoder.trial", AV_CODEC_ID_NONE },
 };
 
@@ -450,6 +449,7 @@ void SoftFFmpegVideo::initPacket(AVPacket *pkt,
         pkt->data = (uint8_t *)inHeader->pBuffer + inHeader->nOffset;
         pkt->size = inHeader->nFilledLen;
         pkt->pts = inHeader->nTimeStamp;
+        pkt->dts = inHeader->nTimeStamp;
     } else {
         pkt->data = NULL;
         pkt->size = 0;
@@ -552,8 +552,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
 
     //process timestamps
     if (decoder_reorder_pts == -1) {
-        pts = *(int64_t*)av_opt_ptr(avcodec_get_frame_class(),
-                mFrame, "best_effort_timestamp");
+        pts = av_frame_get_best_effort_timestamp(mFrame);
     } else if (decoder_reorder_pts) {
         pts = mFrame->pkt_pts;
     } else {

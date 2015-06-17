@@ -93,7 +93,7 @@ typedef struct PacketQueue {
 void packet_queue_init(PacketQueue *q);
 void packet_queue_destroy(PacketQueue *q);
 void packet_queue_flush(PacketQueue *q);
-void packet_queue_end(PacketQueue *q);
+void packet_queue_start(PacketQueue *q);
 void packet_queue_abort(PacketQueue *q);
 int packet_queue_put(PacketQueue *q, AVPacket *pkt);
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index);

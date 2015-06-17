@@ -376,15 +376,12 @@ void packet_queue_init(PacketQueue *q)
     pthread_mutex_init(&q->mutex, NULL);
     pthread_cond_init(&q->cond, NULL);
 
-    av_init_packet(&q->flush_pkt);
-    q->flush_pkt.data = (uint8_t *)&q->flush_pkt;
-    q->flush_pkt.size = 0;
-
-    packet_queue_put(q, &q->flush_pkt);
+    q->abort_request = 1;
 }
 
 void packet_queue_destroy(PacketQueue *q)
 {
+    packet_queue_abort(q);
     packet_queue_flush(q);
     pthread_mutex_destroy(&q->mutex);
     pthread_cond_destroy(&q->cond);
@@ -407,11 +404,6 @@ void packet_queue_flush(PacketQueue *q)
     pthread_mutex_unlock(&q->mutex);
 }
 
-void packet_queue_end(PacketQueue *q)
-{
-    packet_queue_flush(q);
-}
-
 void packet_queue_abort(PacketQueue *q)
 {
     pthread_mutex_lock(&q->mutex);
@@ -423,12 +415,11 @@ void packet_queue_abort(PacketQueue *q)
     pthread_mutex_unlock(&q->mutex);
 }
 
-int packet_queue_put(PacketQueue *q, AVPacket *pkt)
+static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
 {
     AVPacketList *pkt1;
 
-    /* duplicate the packet */
-    if (pkt != &q->flush_pkt && av_dup_packet(pkt) < 0)
+    if (q->abort_request)
         return -1;
 
     pkt1 = (AVPacketList *)av_malloc(sizeof(AVPacketList));
@@ -437,10 +428,7 @@ int packet_queue_put(PacketQueue *q, AVPacket *pkt)
     pkt1->pkt = *pkt;
     pkt1->next = NULL;
 
-    pthread_mutex_lock(&q->mutex);
-
     if (!q->last_pkt)
-
         q->first_pkt = pkt1;
     else
         q->last_pkt->next = pkt1;
@@ -449,9 +437,25 @@ int packet_queue_put(PacketQueue *q, AVPacket *pkt)
     //q->size += pkt1->pkt.size + sizeof(*pkt1);
     q->size += pkt1->pkt.size;
     pthread_cond_signal(&q->cond);
-
-    pthread_mutex_unlock(&q->mutex);
     return 0;
+}
+
+int packet_queue_put(PacketQueue *q, AVPacket *pkt)
+{
+    int ret;
+
+    /* duplicate the packet */
+    if (pkt != &q->flush_pkt && av_dup_packet(pkt) < 0)
+        return -1;
+
+    pthread_mutex_lock(&q->mutex);
+    ret = packet_queue_put_private(q, pkt);
+    pthread_mutex_unlock(&q->mutex);
+
+    if (pkt != &q->flush_pkt && ret < 0)
+        av_free_packet(pkt);
+
+    return ret;
 }
 
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
@@ -500,6 +504,17 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
     }
     pthread_mutex_unlock(&q->mutex);
     return ret;
+}
+
+void packet_queue_start(PacketQueue *q)
+{
+    pthread_mutex_lock(&q->mutex);
+    av_init_packet(&q->flush_pkt);
+    q->flush_pkt.data = (uint8_t *)&q->flush_pkt;
+    q->flush_pkt.size = 0;
+    q->abort_request = 0;
+    packet_queue_put_private(q, &q->flush_pkt);
+    pthread_mutex_unlock(&q->mutex);
 }
 
 //////////////////////////////////////////////////////////////////////////////////

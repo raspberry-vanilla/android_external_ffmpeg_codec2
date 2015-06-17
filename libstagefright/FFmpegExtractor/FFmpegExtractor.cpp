@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <limits.h> /* INT_MAX */
 #include <inttypes.h>
+#include <sys/prctl.h>
 
 #include <utils/misc.h>
 #include <utils/String8.h>
@@ -129,7 +130,7 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
     while(mProbePkts <= EXTRACTOR_MAX_PROBE_PACKETS && !mEOF &&
         (mFormatCtx->pb ? !mFormatCtx->pb->error : 1) &&
         (mDefersToCreateVideoTrack || mDefersToCreateAudioTrack)) {
-        // FIXME, i am so lazy! Should use pthread_cond_wait to wait conditions
+        ALOGV("mProbePkts=%d", mProbePkts);
         usleep(5000);
     }
 
@@ -141,7 +142,7 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
 
 FFmpegExtractor::~FFmpegExtractor() {
     ALOGV("FFmpegExtractor::~FFmpegExtractor");
-
+    Mutex::Autolock autoLock(mLock);
     // stop reader here if no track!
     stopReaderThread();
 
@@ -175,6 +176,12 @@ sp<MetaData> FFmpegExtractor::getTrackMetaData(size_t index, uint32_t flags __un
 
     if (index >= mTracks.size()) {
         return NULL;
+    }
+
+    /* Quick and dirty, just get a frame 1/4 in */
+    if (mFormatCtx->duration != AV_NOPTS_VALUE) {
+        mTracks.itemAt(index).mMeta->setInt64(
+                kKeyThumbnailTime, mFormatCtx->duration / 4);
     }
 
     return mTracks.itemAt(index).mMeta;
@@ -580,7 +587,7 @@ int FFmpegExtractor::stream_component_open(int stream_index)
                 // disable the stream
                 mVideoStreamIdx = -1;
                 mVideoStream = NULL;
-                packet_queue_end(&mVideoQ);
+                packet_queue_flush(&mVideoQ);
                 mFormatCtx->streams[stream_index]->discard = AVDISCARD_ALL;
             }
             return ret;
@@ -622,7 +629,7 @@ int FFmpegExtractor::stream_component_open(int stream_index)
                 // disable the stream
                 mAudioStreamIdx = -1;
                 mAudioStream = NULL;
-                packet_queue_end(&mAudioQ);
+                packet_queue_flush(&mAudioQ);
                 mFormatCtx->streams[stream_index]->discard = AVDISCARD_ALL;
             }
             return ret;
@@ -675,23 +682,14 @@ void FFmpegExtractor::stream_component_close(int stream_index)
     case AVMEDIA_TYPE_VIDEO:
         ALOGV("packet_queue_abort videoq");
         packet_queue_abort(&mVideoQ);
-        /* wait until the end */
-        while (!mAbortRequest && !mVideoEOSReceived) {
-            ALOGV("wait for video received");
-            usleep(10000);
-        }
         ALOGV("packet_queue_end videoq");
-        packet_queue_end(&mVideoQ);
+        packet_queue_flush(&mVideoQ);
         break;
     case AVMEDIA_TYPE_AUDIO:
         ALOGV("packet_queue_abort audioq");
         packet_queue_abort(&mAudioQ);
-        while (!mAbortRequest && !mAudioEOSReceived) {
-            ALOGV("wait for audio received");
-            usleep(10000);
-        }
         ALOGV("packet_queue_end audioq");
-        packet_queue_end(&mAudioQ);
+        packet_queue_flush(&mAudioQ);
         break;
     case AVMEDIA_TYPE_SUBTITLE:
         break;
@@ -733,17 +731,19 @@ void FFmpegExtractor::reachedEOS(enum AVMediaType media_type)
     } else if (media_type == AVMEDIA_TYPE_AUDIO) {
         mAudioEOSReceived = true;
     }
+    mCondition.signal();
 }
 
 /* seek in the stream */
-int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type)
+int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type,
+        MediaSource::ReadOptions::SeekMode mode)
 {
-    Mutex::Autolock autoLock(mLock);
+    Mutex::Autolock _l(mLock);
 
-    if (mVideoStreamIdx >= 0
+    if (mSeekIdx >= 0 || (mVideoStreamIdx >= 0
             && mAudioStreamIdx >= 0
             && media_type == AVMEDIA_TYPE_AUDIO
-            && !mVideoEOSReceived) {
+            && !mVideoEOSReceived)) {
        return NO_SEEK;
     }
 
@@ -753,18 +753,40 @@ int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type)
     if (mVideoStreamIdx >= 0)
         packet_queue_flush(&mVideoQ);
 
-    mSeekPos = pos;
-    mSeekFlags &= ~AVSEEK_FLAG_BYTE;
-    mSeekReq = 1;
+    mSeekIdx = media_type == AVMEDIA_TYPE_VIDEO ? mVideoStreamIdx : mAudioStreamIdx;
+    mSeekPos = av_rescale_q(pos, AV_TIME_BASE_Q, mFormatCtx->streams[mSeekIdx]->time_base);
 
+    //mSeekFlags &= ~AVSEEK_FLAG_BYTE;
+    //if (mSeekByBytes) {
+    //    mSeekFlags |= AVSEEK_FLAG_BYTE;
+    //}
+
+    switch (mode) {
+        case MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC:
+            mSeekMin = INT64_MIN;
+            mSeekMax = mSeekPos;
+            break;
+        case MediaSource::ReadOptions::SEEK_CLOSEST_SYNC:
+            mSeekMin = INT64_MIN;
+            mSeekMax = INT64_MAX;
+            break;
+        case MediaSource::ReadOptions::SEEK_NEXT_SYNC:
+            mSeekMin = mSeekPos;
+            mSeekMax = INT64_MAX;
+            break;
+        default:
+            TRESPASS();
+    }
+
+    mCondition.wait(mLock);
     return SEEK;
 }
 
 // staitc
 int FFmpegExtractor::decode_interrupt_cb(void *ctx)
 {
-    FFmpegExtractor *extrator = static_cast<FFmpegExtractor *>(ctx);
-    return extrator->mAbortRequest;
+    FFmpegExtractor *extractor = static_cast<FFmpegExtractor *>(ctx);
+    return extractor->mAbortRequest;
 }
 
 void FFmpegExtractor::fetchStuffsFromSniffedMeta(const sp<AMessage> &meta)
@@ -800,10 +822,11 @@ void FFmpegExtractor::setFFmpegDefaultOpts()
     mAudioDisable = 0;
 #endif
     mShowStatus   = 0;
-    mSeekByBytes  = -1; /* seek by bytes 0=off 1=on -1=auto" */
+    mSeekByBytes  = 0; /* seek by bytes 0=off 1=on -1=auto" */
     mDuration     = AV_NOPTS_VALUE;
     mSeekPos      = AV_NOPTS_VALUE;
-    mAutoExit     = 0;
+    mSeekMin      = INT64_MIN;
+    mSeekMax      = INT64_MAX;
     mLoop         = 1;
 
     mVideoStreamIdx = -1;
@@ -818,10 +841,11 @@ void FFmpegExtractor::setFFmpegDefaultOpts()
     mAbortRequest = 0;
     mPaused       = 0;
     mLastPaused   = 0;
-    mSeekReq      = 0;
-
     mProbePkts    = 0;
     mEOF          = false;
+
+    mSeekIdx      = -1;
+    mSeekMode     = MediaSource::ReadOptions::SEEK_CLOSEST_SYNC;
 }
 
 int FFmpegExtractor::initStreams()
@@ -896,7 +920,8 @@ int FFmpegExtractor::initStreams()
         mFormatCtx->pb->eof_reached = 0; // FIXME hack, ffplay maybe should not use url_feof() to test for the end
 
     if (mSeekByBytes < 0)
-        mSeekByBytes = !!(mFormatCtx->iformat->flags & AVFMT_TS_DISCONT);
+        mSeekByBytes = !!(mFormatCtx->iformat->flags & AVFMT_TS_DISCONT)
+            && strcmp("ogg", mFormatCtx->iformat->name);
 
     for (i = 0; i < (int)mFormatCtx->nb_streams; i++)
         mFormatCtx->streams[i]->discard = AVDISCARD_ALL;
@@ -937,10 +962,14 @@ int FFmpegExtractor::initStreams()
 
     if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
         audio_ret = stream_component_open(st_index[AVMEDIA_TYPE_AUDIO]);
+        if (audio_ret >= 0)
+            packet_queue_start(&mAudioQ);
     }
 
     if (st_index[AVMEDIA_TYPE_VIDEO] >= 0) {
         video_ret = stream_component_open(st_index[AVMEDIA_TYPE_VIDEO]);
+        if (video_ret >= 0)
+            packet_queue_start(&mVideoQ);
     }
 
     if ( audio_ret < 0 && video_ret < 0) {
@@ -971,7 +1000,6 @@ void FFmpegExtractor::deInitStreams()
 
 status_t FFmpegExtractor::startReaderThread() {
     ALOGV("Starting reader thread");
-    Mutex::Autolock autoLock(mLock);
 
     if (mReaderThreadStarted)
         return OK;
@@ -979,17 +1007,20 @@ status_t FFmpegExtractor::startReaderThread() {
     pthread_attr_t attr;
     pthread_attr_init(&attr);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+    ALOGD("Reader thread starting");
+
     pthread_create(&mReaderThread, &attr, ReaderWrapper, this);
     pthread_attr_destroy(&attr);
+
     mReaderThreadStarted = true;
-    ALOGD("Reader thread started");
+    mCondition.signal();
 
     return OK;
 }
 
 void FFmpegExtractor::stopReaderThread() {
     ALOGV("Stopping reader thread");
-    Mutex::Autolock autoLock(mLock);
 
     if (!mReaderThreadStarted) {
         ALOGD("Reader thread have been stopped");
@@ -997,9 +1028,20 @@ void FFmpegExtractor::stopReaderThread() {
     }
 
     mAbortRequest = 1;
+    mCondition.signal();
 
-    void *dummy;
-    pthread_join(mReaderThread, &dummy);
+    /* close each stream */
+    if (mAudioStreamIdx >= 0)
+        stream_component_close(mAudioStreamIdx);
+    if (mVideoStreamIdx >= 0)
+        stream_component_close(mVideoStreamIdx);
+
+    pthread_join(mReaderThread, NULL);
+
+    if (mFormatCtx) {
+        avformat_close_input(&mFormatCtx);
+    }
+
     mReaderThreadStarted = false;
     ALOGD("Reader thread stopped");
 }
@@ -1017,14 +1059,27 @@ void FFmpegExtractor::readerEntry() {
     int eof = 0;
     int pkt_in_play_range = 0;
 
-    ALOGV("FFmpegExtractor enter thread(readerEntry)");
+    mLock.lock();
+
+    pid_t tid  = gettid();
+    androidSetThreadPriority(tid,
+            mVideoStreamIdx >= 0 ? ANDROID_PRIORITY_NORMAL : ANDROID_PRIORITY_AUDIO);
+    prctl(PR_SET_NAME, (unsigned long)"FFmpegExtractor Thread", 0, 0, 0);
+
+    ALOGV("FFmpegExtractor wait for signal");
+    while (!mReaderThreadStarted && !mAbortRequest) {
+        mCondition.wait(mLock);
+    }
+    ALOGV("FFmpegExtractor ready to run");
+    mLock.unlock();
+    if (mAbortRequest) {
+        return;
+    }
 
     mVideoEOSReceived = false;
     mAudioEOSReceived = false;
 
-    for (;;) {
-        if (mAbortRequest)
-            break;
+    while (!mAbortRequest) {
 
         if (mPaused != mLastPaused) {
             mLastPaused = mPaused;
@@ -1044,9 +1099,10 @@ void FFmpegExtractor::readerEntry() {
         }
 #endif
 
-        if (mSeekReq) {
-            ALOGV("readerEntry, mSeekReq: %d", mSeekReq);
-            ret = avformat_seek_file(mFormatCtx, -1, INT64_MIN, mSeekPos, INT64_MAX, mSeekFlags);
+        if (mSeekIdx >= 0) {
+            Mutex::Autolock _l(mLock);
+            ALOGV("readerEntry, mSeekIdx: %d mSeekPos: %lld (%lld/%lld)", mSeekIdx, mSeekPos, mSeekMin, mSeekMax);
+            ret = avformat_seek_file(mFormatCtx, mSeekIdx, mSeekMin, mSeekPos, mSeekMax, AVSEEK_FLAG_BACKWARD);
             if (ret < 0) {
                 ALOGE("%s: error while seeking", mFormatCtx->filename);
             } else {
@@ -1059,8 +1115,9 @@ void FFmpegExtractor::readerEntry() {
                     packet_queue_put(&mVideoQ, &mVideoQ.flush_pkt);
                 }
             }
-            mSeekReq = 0;
-            eof = 0;
+            mSeekIdx = -1;
+            eof = false;
+            mCondition.signal();
         }
 
         /* if the queue are full, no need to read more */
@@ -1072,7 +1129,9 @@ void FFmpegExtractor::readerEntry() {
                     mVideoQ.size, mVideoQ.nb_packets, mAudioQ.size, mAudioQ.nb_packets);
 #endif
             /* wait 10 ms */
-            usleep(10000);
+            mExtractorMutex.lock();
+            mCondition.waitRelative(mExtractorMutex, milliseconds(10));
+            mExtractorMutex.unlock();
             continue;
         }
 
@@ -1083,39 +1142,28 @@ void FFmpegExtractor::readerEntry() {
             if (mAudioStreamIdx >= 0) {
                 packet_queue_put_nullpacket(&mAudioQ, mAudioStreamIdx);
             }
-            usleep(10000);
-#if DEBUG_READ_ENTRY
-            ALOGV("readerEntry, eof = 1, mVideoQ.size: %d, mVideoQ.nb_packets: %d, mAudioQ.size: %d, mAudioQ.nb_packets: %d",
-                    mVideoQ.size, mVideoQ.nb_packets, mAudioQ.size, mAudioQ.nb_packets);
-#endif
-            if (mAudioQ.size + mVideoQ.size  == 0) {
-                if (mAutoExit) {
-                    ret = AVERROR_EOF;
-                    goto fail;
-                }
-            }
-            eof=0;
+            /* wait 10 ms */
+            mExtractorMutex.lock();
+            mCondition.waitRelative(mExtractorMutex, milliseconds(10));
+            eof = false;
+            mExtractorMutex.unlock();
             continue;
         }
 
         ret = av_read_frame(mFormatCtx, pkt);
+
         mProbePkts++;
         if (ret < 0) {
-            if (ret == AVERROR_EOF || mFormatCtx->pb->eof_reached)
-                if (ret == AVERROR_EOF) {
-                    //ALOGV("ret == AVERROR_EOF");
-                }
-                if (mFormatCtx->pb->eof_reached) {
-                    //ALOGV("url_feof(mFormatCtx->pb)");
-                }
-
-                eof = 1;
-                mEOF = true;
+            mEOF = true;
+            eof = true;
             if (mFormatCtx->pb && mFormatCtx->pb->error) {
                 ALOGE("mFormatCtx->pb->error: %d", mFormatCtx->pb->error);
                 break;
             }
-            usleep(100000);
+            /* wait 10 ms */
+            mExtractorMutex.lock();
+            mCondition.waitRelative(mExtractorMutex, milliseconds(10));
+            mExtractorMutex.unlock();
             continue;
         }
 
@@ -1189,24 +1237,10 @@ void FFmpegExtractor::readerEntry() {
             av_free_packet(pkt);
         }
     }
-    /* wait until the end */
-    while (!mAbortRequest) {
-        usleep(100000);
-    }
 
     ret = 0;
+
 fail:
-    ALOGI("reader thread goto end...");
-
-    /* close each stream */
-    if (mAudioStreamIdx >= 0)
-        stream_component_close(mAudioStreamIdx);
-    if (mVideoStreamIdx >= 0)
-        stream_component_close(mVideoStreamIdx);
-    if (mFormatCtx) {
-        avformat_close_input(&mFormatCtx);
-    }
-
     ALOGV("FFmpegExtractor exit thread(readerEntry)");
 }
 
@@ -1222,10 +1256,10 @@ FFmpegSource::FFmpegSource(
       mQueue(mExtractor->mTracks.itemAt(index).mQueue) {
     sp<MetaData> meta = mExtractor->mTracks.itemAt(index).mMeta;
 
-    /* H.264 Video Types */
     {
         AVCodecContext *avctx = mStream->codec;
 
+        /* Parse codec specific data */
         if (avctx->codec_id == AV_CODEC_ID_H264
                 && avctx->extradata_size > 0
                 && avctx->extradata[0] == 1) {
@@ -1280,8 +1314,6 @@ status_t FFmpegSource::read(
         MediaBuffer **buffer, const ReadOptions *options) {
     *buffer = NULL;
 
-    Mutex::Autolock autoLock(mLock);
-
     AVPacket pkt;
     bool seeking = false;
     bool waitKeyPkt = false;
@@ -1298,9 +1330,7 @@ status_t FFmpegSource::read(
         if (mStream->start_time != AV_NOPTS_VALUE)
             seekTimeUs += mStream->start_time * av_q2d(mStream->time_base) * 1000000;
         ALOGV("~~~%s seekTimeUs[+startTime]: %lld, mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, mode);
-
-        if (mExtractor->stream_seek(seekTimeUs, mMediaType) == SEEK)
-            seeking = true;
+        seeking = (mExtractor->stream_seek(seekTimeUs, mMediaType, mode) == SEEK);
     }
 
 retry:
@@ -1331,22 +1361,11 @@ retry:
         ALOGD("read %s eos pkt", av_get_media_type_string(mMediaType));
         av_free_packet(&pkt);
         mExtractor->reachedEOS(mMediaType);
-	    return ERROR_END_OF_STREAM;
+        return ERROR_END_OF_STREAM;
     }
 
     key = pkt.flags & AV_PKT_FLAG_KEY ? 1 : 0;
-    pktTS = pkt.pts; //FIXME AV_NOPTS_VALUE??
-
-    //use dts when AVI
-    if (pkt.pts == AV_NOPTS_VALUE)
-        pktTS = pkt.dts;
-
-    //FIXME, drop, omxcodec requires a positive timestamp! e.g. vorbis
-    if (pktTS != AV_NOPTS_VALUE && pktTS < 0) {
-        ALOGW("drop the packet with negative timestamp(pts:%lld)", pktTS);
-        av_free_packet(&pkt);
-        goto retry;
-    }
+    pktTS = pkt.pts == AV_NOPTS_VALUE ? pkt.dts : pkt.pts;
 
     if (waitKeyPkt) {
         if (!key) {
@@ -1362,12 +1381,6 @@ retry:
     if (pktTS != AV_NOPTS_VALUE && mFirstKeyPktTimestamp == AV_NOPTS_VALUE) {
         // update the first key timestamp
         mFirstKeyPktTimestamp = pktTS;
-    }
-     
-    if (pktTS != AV_NOPTS_VALUE && pktTS < mFirstKeyPktTimestamp) {
-            ALOGV("drop the packet with the backward timestamp, maybe they are B-frames after I-frame ^_^");
-            av_free_packet(&pkt);
-            goto retry;
     }
 
     MediaBuffer *mediaBuffer = new MediaBuffer(pkt.size + FF_INPUT_BUFFER_PADDING_SIZE);
@@ -1395,14 +1408,14 @@ retry:
 
     int64_t start_time = mStream->start_time != AV_NOPTS_VALUE ? mStream->start_time : 0;
     if (pktTS != AV_NOPTS_VALUE)
-        timeUs = (int64_t)((pktTS - start_time) * av_q2d(mStream->time_base) * 1000000);
+        timeUs = (pktTS - start_time) * av_q2d(mStream->time_base) * 1000000;
     else
         timeUs = SF_NOPTS_VALUE; //FIXME AV_NOPTS_VALUE is negative, but stagefright need positive
 
 #if DEBUG_PKT
     if (pktTS != AV_NOPTS_VALUE)
-        ALOGV("read %s pkt, size:%d, key:%d, pts:%lld, dts:%lld, timeUs[-startTime]:%lld us (%.2f secs)",
-            av_get_media_type_string(mMediaType), pkt.size, key, pkt.pts, pkt.dts, timeUs, timeUs/1E6);
+        ALOGV("read %s pkt, size:%d, key:%d, pktPTS: %lld, pts:%lld, dts:%lld, timeUs[-startTime]:%lld us (%.2f secs) start_time=%lld",
+            av_get_media_type_string(mMediaType), pkt.size, key, pktTS, pkt.pts, pkt.dts, timeUs, timeUs/1E6, start_time);
     else
         ALOGV("read %s pkt, size:%d, key:%d, pts:N/A, dts:N/A, timeUs[-startTime]:N/A",
             av_get_media_type_string(mMediaType), pkt.size, key);
@@ -1553,9 +1566,9 @@ static void adjustMPEG4Confidence(AVFormatContext *ic, float *confidence)
 		*confidence = 0.41f;
 	}
 
-	codec_id = getCodecId(ic, AVMEDIA_TYPE_AUDIO);
-	if (codec_id != AV_CODEC_ID_NONE
-			&& codec_id != AV_CODEC_ID_MP3
+    codec_id = getCodecId(ic, AVMEDIA_TYPE_AUDIO);
+    if (codec_id != AV_CODEC_ID_NONE
+            && codec_id != AV_CODEC_ID_MP3
 			&& codec_id != AV_CODEC_ID_AAC
 			&& codec_id != AV_CODEC_ID_AMR_NB
 			&& codec_id != AV_CODEC_ID_AMR_WB) {
@@ -1664,10 +1677,10 @@ static void adjustCodecConfidence(AVFormatContext *ic, float *confidence)
 		}
 	}
 
-	if (getCodecId(ic, AVMEDIA_TYPE_VIDEO) != AV_CODEC_ID_NONE
-			&& getCodecId(ic, AVMEDIA_TYPE_AUDIO) == AV_CODEC_ID_MP3) {
-		*confidence = 0.22f; //larger than MP3Extractor
-	}
+    if (getCodecId(ic, AVMEDIA_TYPE_VIDEO) != AV_CODEC_ID_NONE
+            && getCodecId(ic, AVMEDIA_TYPE_AUDIO) == AV_CODEC_ID_MP3) {
+        *confidence = 0.22f; //larger than MP3Extractor
+    }
 }
 
 //TODO need more checks

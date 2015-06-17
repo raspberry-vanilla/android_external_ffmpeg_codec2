@@ -22,6 +22,7 @@
 #include <media/stagefright/MediaExtractor.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
+#include <media/stagefright/MediaSource.h>
 
 #include "utils/ffmpeg_utils.h"
 
@@ -59,6 +60,9 @@ private:
     Vector<TrackInfo> mTracks;
 
     mutable Mutex mLock;
+    mutable Mutex mExtractorMutex;
+    Condition mCondition;
+
     sp<DataSource> mDataSource;
     sp<MetaData> mMeta;
     status_t mInitCheck;
@@ -79,9 +83,12 @@ private:
     int mAbortRequest;
     int mPaused;
     int mLastPaused;
-    int mSeekReq;
-    int mSeekFlags;
+    int mSeekIdx;
+    MediaSource::ReadOptions::SeekMode mSeekMode;
     int64_t mSeekPos;
+    int64_t mSeekMin;
+    int64_t mSeekMax;
+
     int mReadPauseReturn;
     PacketQueue mAudioQ;
     PacketQueue mVideoQ;
@@ -112,7 +119,8 @@ private:
     int stream_component_open(int stream_index);
     void stream_component_close(int stream_index);
     void reachedEOS(enum AVMediaType media_type);
-    int stream_seek(int64_t pos, enum AVMediaType media_type);
+    int stream_seek(int64_t pos, enum AVMediaType media_type,
+            MediaSource::ReadOptions::SeekMode mode);
     int check_extradata(AVCodecContext *avctx);
 
     bool mReaderThreadStarted;
