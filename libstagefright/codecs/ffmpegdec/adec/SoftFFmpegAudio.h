@@ -138,11 +138,11 @@ private:
     bool mReconfiguring;
 
     void setMode(const char *name);
-	void initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE &def);
+    void initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE &def);
     void setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec);
-	void resetCtx();
-	OMX_ERRORTYPE isRoleSupported(const OMX_PARAM_COMPONENTROLETYPE *roleParams);
-	void adjustAudioParams();
+    void resetCtx();
+    OMX_ERRORTYPE isRoleSupported(const OMX_PARAM_COMPONENTROLETYPE *roleParams);
+    void adjustAudioParams();
     bool isConfigured();
 
     void initPorts();
@@ -156,7 +156,7 @@ private:
     int32_t openDecoder();
     void    updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader);
     void    initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
-	int32_t decodeAudio();
+    int32_t decodeAudio();
     int32_t resampleAudio();
     void    drainOneOutputBuffer();
     void    drainEOSOutputBuffer();

@@ -187,7 +187,7 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
 }
 
 bool SoftFFmpegAudio::isConfigured() {
-	return mCtx->channels > 0;
+    return mCtx->channels > 0;
 }
 
 void SoftFFmpegAudio::resetCtx() {
@@ -590,7 +590,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
         {
             const OMX_PARAM_COMPONENTROLETYPE *roleParams =
                 (const OMX_PARAM_COMPONENTROLETYPE *)params;
-			return isRoleSupported(roleParams);
+            return isRoleSupported(roleParams);
         }
 
         case OMX_IndexParamAudioPcm:
@@ -987,14 +987,14 @@ int32_t SoftFFmpegAudio::openDecoder() {
 
     if (!mExtradataReady && !mIgnoreExtradata) {
         if (mCtx->codec_id == AV_CODEC_ID_VORBIS) {
-		    if (!setup_vorbis_extradata(&mCtx->extradata,
+            if (!setup_vorbis_extradata(&mCtx->extradata,
                         &mCtx->extradata_size,
                         (const uint8_t **)mVorbisHeaderStart,
                         mVorbisHeaderLen)) {
                 return ERR_OOM;
             }
             deinitVorbisHdr();
-	    }
+        }
         ALOGI("extradata is ready, size: %d", mCtx->extradata_size);
         hexdump(mCtx->extradata, mCtx->extradata_size);
         mExtradataReady = true;
@@ -1085,9 +1085,9 @@ void SoftFFmpegAudio::initPacket(AVPacket *pkt,
 int32_t SoftFFmpegAudio::decodeAudio() {
     int len = 0;
     int gotFrm = false;
-	int32_t ret = ERR_OK;
+    int32_t ret = ERR_OK;
     int32_t inputBufferUsedLength = 0;
-	bool is_flush = (mEOSStatus != INPUT_DATA_AVAILABLE);
+    bool is_flush = (mEOSStatus != INPUT_DATA_AVAILABLE);
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     BufferInfo *inInfo = NULL;
     OMX_BUFFERHEADERTYPE *inHeader = NULL;
@@ -1127,16 +1127,16 @@ int32_t SoftFFmpegAudio::decodeAudio() {
             //stop sending empty packets if the decoder is finished
             if (is_flush && mCtx->codec->capabilities & CODEC_CAP_DELAY) {
                 ALOGI("ffmpeg audio decoder failed to get more frames when flush.");
-			    ret = ERR_FLUSHED;
-		    } else {
-		        ret = ERR_NO_FRM;
-		    }
+                ret = ERR_FLUSHED;
+            } else {
+                ret = ERR_NO_FRM;
+            }
         } else {
             ret = resampleAudio();
-		}
+        }
     }
 
-	if (!is_flush) {
+    if (!is_flush) {
         if (len < 0) {
             //if error, we skip the frame 
             inputBufferUsedLength = mInputBufferSize;
@@ -1155,13 +1155,13 @@ int32_t SoftFFmpegAudio::decodeAudio() {
             inInfo->mOwnedByUs = false;
             notifyEmptyBufferDone(inHeader);
         }
-	}
+    }
 
     return ret;
 }
 
 int32_t SoftFFmpegAudio::resampleAudio() {
-	int channels = 0;
+    int channels = 0;
     int64_t channelLayout = 0;
     size_t dataSize = 0;
 
@@ -1173,7 +1173,7 @@ int32_t SoftFFmpegAudio::resampleAudio() {
             mFrame->nb_samples, dataSize);
 #endif
 
-	channels = av_get_channel_layout_nb_channels(mFrame->channel_layout);
+    channels = av_get_channel_layout_nb_channels(mFrame->channel_layout);
     channelLayout =
         (mFrame->channel_layout && av_frame_get_channels(mFrame) == channels) ?
         mFrame->channel_layout : av_get_default_channel_layout(av_frame_get_channels(mFrame));
@@ -1274,7 +1274,7 @@ int32_t SoftFFmpegAudio::resampleAudio() {
 #endif
     }
 
-	return ERR_OK;
+    return ERR_OK;
 }
 
 void SoftFFmpegAudio::drainOneOutputBuffer() {
@@ -1290,12 +1290,12 @@ void SoftFFmpegAudio::drainOneOutputBuffer() {
         inHeader = inInfo->mHeader;
     }
 
-	CHECK_GT(mResampledDataSize, 0);
+    CHECK_GT(mResampledDataSize, 0);
 
     size_t copy = mResampledDataSize;
     if (mResampledDataSize > kOutputBufferSize) {
         copy = kOutputBufferSize;
-	}
+    }
 
     outHeader->nOffset = 0;
     outHeader->nFilledLen = copy;
@@ -1323,11 +1323,11 @@ void SoftFFmpegAudio::drainOneOutputBuffer() {
 
 void SoftFFmpegAudio::drainEOSOutputBuffer() {
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
-	BufferInfo *outInfo = *outQueue.begin();
-	CHECK(outInfo != NULL);
-	OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
+    BufferInfo *outInfo = *outQueue.begin();
+    CHECK(outInfo != NULL);
+    OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
-	// CHECK_EQ(mResampledDataSize, 0);
+    // CHECK_EQ(mResampledDataSize, 0);
 
     ALOGD("ffmpeg audio decoder fill eos outbuf");
 
@@ -1363,16 +1363,16 @@ void SoftFFmpegAudio::drainAllOutputBuffers() {
             if (err < ERR_OK) {
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
-			    return;
+                return;
             } else if (err == ERR_FLUSHED) {
                 drainEOSOutputBuffer();
                 return;
-			} else {
+            } else {
                 CHECK_EQ(err, ERR_OK);
-			}
+            }
         }
 
-		if (mResampledDataSize > 0) {
+        if (mResampledDataSize > 0) {
             drainOneOutputBuffer();
         }
     }
@@ -1414,7 +1414,7 @@ void SoftFFmpegAudio::onQueueFilled(OMX_U32 /* portIndex */) {
         }
 
         if (inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
-		    if (handleExtradata() != ERR_OK) {
+            if (handleExtradata() != ERR_OK) {
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
                 return;
@@ -1426,27 +1426,27 @@ void SoftFFmpegAudio::onQueueFilled(OMX_U32 /* portIndex */) {
             if (openDecoder() != ERR_OK) {
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
-	            return;
+                return;
             }
         }
 
-		if (mResampledDataSize == 0) {
-			int32_t err = decodeAudio();
+        if (mResampledDataSize == 0) {
+            int32_t err = decodeAudio();
             if (err < ERR_OK) {
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
-			    return;
+                return;
             } else if (err == ERR_NO_FRM) {
                 CHECK_EQ(mResampledDataSize, 0);
                 continue;
-			} else {
+            } else {
                 CHECK_EQ(err, ERR_OK);
-			}
-		}
+            }
+        }
 
-		if (mResampledDataSize > 0) {
-			drainOneOutputBuffer();
-		}
+        if (mResampledDataSize > 0) {
+            drainOneOutputBuffer();
+        }
     }
 }
 
@@ -1459,10 +1459,10 @@ void SoftFFmpegAudio::onPortFlushCompleted(OMX_U32 portIndex) {
             avcodec_flush_buffers(mCtx);
         }
 
-	    setAudioClock(0);
-	    mInputBufferSize = 0;
-	    mResampledDataSize = 0;
-	    mResampledData = NULL;
+        setAudioClock(0);
+        mInputBufferSize = 0;
+        mResampledDataSize = 0;
+        mResampledData = NULL;
         mEOSStatus = INPUT_DATA_AVAILABLE;
     }
 }

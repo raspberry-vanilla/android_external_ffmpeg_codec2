@@ -64,11 +64,11 @@ private:
     enum {
         ERR_NO_FRM              = 2,
         ERR_FLUSHED             = 1,
-		ERR_OK                  = 0,  //No errors
+        ERR_OK                  = 0,  //No errors
         ERR_OOM                 = -1, //Out of memmory
-		ERR_CODEC_NOT_FOUND     = -2,
-		ERR_DECODER_OPEN_FAILED = -2,
-		ERR_SWS_FAILED          = -3,
+        ERR_CODEC_NOT_FOUND     = -2,
+        ERR_DECODER_OPEN_FAILED = -2,
+        ERR_SWS_FAILED          = -3,
     };
 
     OMX_VIDEO_CODINGTYPE mCodingType;
@@ -76,7 +76,7 @@ private:
     bool mCodecAlreadyOpened;
     AVCodecContext *mCtx;
     struct SwsContext *mImgConvertCtx;
-	AVFrame *mFrame;
+    AVFrame *mFrame;
 
     EOSStatus mEOSStatus;
 
@@ -89,7 +89,7 @@ private:
     bool mSignalledError;
 
     void     initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE *def);
-	void     getInputFormat(uint32_t mode, OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams);
+    void     getInputFormat(uint32_t mode, OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams);
     void     setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec);
     OMX_ERRORTYPE isRoleSupported(const OMX_PARAM_COMPONENTROLETYPE *roleParams);
 
@@ -98,14 +98,14 @@ private:
 
     bool     isPortSettingChanged();
 
-	int32_t  handleExtradata();
-	int32_t  openDecoder();
+    int32_t  handleExtradata();
+    int32_t  openDecoder();
     void     initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
     int32_t  decodeVideo();
     int32_t  preProcessVideoFrame(AVPicture *picture, void **bufp);
-	int32_t  drainOneOutputBuffer();
-	void     drainEOSOutputBuffer();
-	void     drainAllOutputBuffers();
+    int32_t  drainOneOutputBuffer();
+    void     drainEOSOutputBuffer();
+    void     drainAllOutputBuffers();
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftFFmpegVideo);
 };

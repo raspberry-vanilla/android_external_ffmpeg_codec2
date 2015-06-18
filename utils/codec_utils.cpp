@@ -106,9 +106,9 @@ sp<MetaData> setAVCFormat(AVCodecContext *avctx)
 {
     ALOGV("AVC");
 
-	CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
-	CHECK_GT(avctx->extradata_size, 0);
-	CHECK_EQ(avctx->extradata[0], 1); //configurationVersion
+    CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
+    CHECK_GT(avctx->extradata_size, 0);
+    CHECK_EQ(avctx->extradata[0], 1); //configurationVersion
 
     if (avctx->width == 0 || avctx->height == 0) {
          int32_t width, height;
@@ -123,7 +123,7 @@ sp<MetaData> setAVCFormat(AVCodecContext *avctx)
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
     meta->setData(kKeyAVCC, kTypeAVCC, avctx->extradata, avctx->extradata_size);
 
-	return meta;
+    return meta;
 }
 
 // H.264 bitstream with start codes.
@@ -131,8 +131,8 @@ sp<MetaData> setH264Format(AVCodecContext *avctx)
 {
     ALOGV("H264");
 
-	CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
-	CHECK_NE(avctx->extradata[0], 1); //configurationVersion
+    CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
+    CHECK_NE(avctx->extradata[0], 1); //configurationVersion
 
     sp<ABuffer> buffer = new ABuffer(avctx->extradata_size);
     memcpy(buffer->data(), avctx->extradata, avctx->extradata_size);

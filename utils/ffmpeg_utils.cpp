@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Michael Chen <omxcodec@gmail.com>
+ * Copyright 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -275,7 +276,7 @@ void deInitFFmpeg()
 //////////////////////////////////////////////////////////////////////////////////
 /* H.264 bitstream with start codes, NOT AVC1! */
 static int h264_split(AVCodecContext *avctx __unused,
-		const uint8_t *buf, int buf_size, int check_compatible_only)
+        const uint8_t *buf, int buf_size, int check_compatible_only)
 {
     int i;
     uint32_t state = -1;
@@ -296,9 +297,9 @@ static int h264_split(AVCodecContext *avctx __unused,
                 return (has_sps & has_pps);
         }
         if((state&0xFFFFFF00) == 0x100
-				&& ((state&0xFFFFFF1F) == 0x101
-					|| (state&0xFFFFFF1F) == 0x102
-					|| (state&0xFFFFFF1F) == 0x105)){
+                && ((state&0xFFFFFF1F) == 0x101
+                    || (state&0xFFFFFF1F) == 0x102
+                    || (state&0xFFFFFF1F) == 0x105)){
             if(has_pps){
                 while(i>4 && buf[i-5]==0) i--;
                 return i-4;
@@ -311,7 +312,7 @@ static int h264_split(AVCodecContext *avctx __unused,
 }
 
 static int mpegvideo_split(AVCodecContext *avctx __unused,
-		const uint8_t *buf, int buf_size, int check_compatible_only __unused)
+        const uint8_t *buf, int buf_size, int check_compatible_only __unused)
 {
     int i;
     uint32_t state= -1;
@@ -329,7 +330,7 @@ static int mpegvideo_split(AVCodecContext *avctx __unused,
 
 /* split extradata from buf for Android OMXCodec */
 int parser_split(AVCodecContext *avctx,
-		const uint8_t *buf, int buf_size)
+        const uint8_t *buf, int buf_size)
 {
     if (!avctx || !buf || buf_size <= 0) {
         ALOGE("parser split, valid params");
@@ -352,15 +353,15 @@ int is_extradata_compatible_with_android(AVCodecContext *avctx)
 {
     if (avctx->extradata_size <= 0) {
         ALOGI("extradata_size <= 0, extradata is not compatible with "
-				"android decoder, the codec id: 0x%0x", avctx->codec_id);
+                "android decoder, the codec id: 0x%0x", avctx->codec_id);
         return 0;
     }
 
     if (avctx->codec_id == AV_CODEC_ID_H264
-			&& avctx->extradata[0] != 1 /* configurationVersion */) {
+            && avctx->extradata[0] != 1 /* configurationVersion */) {
         // SPS + PPS
         return !!(h264_split(avctx, avctx->extradata,
-					avctx->extradata_size, 1) > 0);
+                    avctx->extradata_size, 1) > 0);
     } else {
         // default, FIXME
         return !!(avctx->extradata_size > 0);
@@ -523,7 +524,7 @@ void packet_queue_start(PacketQueue *q)
 bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
         const uint8_t *header_start[3], const int header_len[3])
 {
-	uint8_t *p = NULL;
+    uint8_t *p = NULL;
     int len = 0;
     int i = 0;
 
@@ -532,7 +533,7 @@ bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
     if (!p) {
         ALOGE("oom for vorbis extradata");
         return false;
-	}
+    }
 
     *p++ = 2;
     p += av_xiphlacing(p, header_len[0]);

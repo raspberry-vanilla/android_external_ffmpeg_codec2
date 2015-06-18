@@ -200,7 +200,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalGetParameter(
             return OMX_ErrorNone;
         }
 
-		case OMX_IndexParamVideoFFmpeg:
+        case OMX_IndexParamVideoFFmpeg:
         {
             OMX_VIDEO_PARAM_FFMPEGTYPE *profile =
                 (OMX_VIDEO_PARAM_FFMPEGTYPE *)params;
@@ -222,7 +222,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalGetParameter(
 }
 
 OMX_ERRORTYPE SoftFFmpegVideo::isRoleSupported(
-		        const OMX_PARAM_COMPONENTROLETYPE *roleParams) {
+                const OMX_PARAM_COMPONENTROLETYPE *roleParams) {
     for (size_t i = 0;
          i < sizeof(kVideoCodingMapEntry) / sizeof(kVideoCodingMapEntry[0]);
          ++i) {
@@ -369,7 +369,7 @@ int32_t SoftFFmpegVideo::handleExtradata() {
 
     if (mIgnoreExtradata) {
         ALOGI("got extradata, size: %lu, but ignore it", inHeader->nFilledLen);
-	} else {
+    } else {
         if (!mExtradataReady) {
             //if (mMode == MODE_H264)
             //it is possible to receive multiple input buffer with OMX_BUFFERFLAG_CODECCONFIG flag.
@@ -426,7 +426,7 @@ int32_t SoftFFmpegVideo::openDecoder() {
         ALOGE("ffmpeg video decoder failed to initialize. (%s)", av_err2str(err));
         return ERR_DECODER_OPEN_FAILED;
     }
-	mCodecAlreadyOpened = true;
+    mCodecAlreadyOpened = true;
 
     ALOGD("open ffmpeg video decoder(%s) success",
             avcodec_get_name(mCtx->codec_id));
@@ -502,23 +502,23 @@ int32_t SoftFFmpegVideo::decodeVideo() {
                 ret = ERR_NO_FRM;
             }
         } else {
-			ret = ERR_OK;
+            ret = ERR_OK;
         }
     }
 
-	if (!is_flush) {
+    if (!is_flush) {
         inQueue.erase(inQueue.begin());
         inInfo->mOwnedByUs = false;
         notifyEmptyBufferDone(inHeader);
-	}
+    }
 
-	return ret;
+    return ret;
 }
 
 int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     List<BufferInfo *> &outQueue = getPortQueue(kOutputPortIndex);
     BufferInfo *outInfo = *outQueue.begin();
-	OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
+    OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
     AVPicture pict;
     int64_t pts = AV_NOPTS_VALUE;
@@ -599,7 +599,7 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
    if (!mCodecAlreadyOpened) {
         drainEOSOutputBuffer();
         mEOSStatus = OUTPUT_FRAMES_FLUSHED;
-	   return;
+       return;
    }
 
     if(!(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
@@ -624,7 +624,7 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
             notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
             mSignalledError = true;
             return;
-		}
+        }
     }
 }
 
@@ -671,7 +671,7 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
         }
 
         if (!mCodecAlreadyOpened) {
-		    if (openDecoder() != ERR_OK) {
+            if (openDecoder() != ERR_OK) {
                 notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
                 mSignalledError = true;
                 return;
@@ -702,7 +702,7 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
             notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
             mSignalledError = true;
             return;
-		}
+        }
     }
 }
 
