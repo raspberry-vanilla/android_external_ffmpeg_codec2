@@ -191,15 +191,16 @@ bool SoftFFmpegAudio::isConfigured() {
 }
 
 void SoftFFmpegAudio::resetCtx() {
-    mCtx->channels = 0;
-    mCtx->sample_rate = 0;
+    mCtx->channels = 2;
+    mCtx->sample_rate = 44100;
     mCtx->bit_rate = 0;
     mCtx->sample_fmt = AV_SAMPLE_FMT_NONE;
 
-    mAudioSrcChannels = mAudioTgtChannels = 0;
-    mAudioSrcFreq = mAudioTgtFreq = 0;
+    mAudioSrcChannels = mAudioTgtChannels = 2;
+    mAudioSrcFreq = mAudioTgtFreq = 44100;
     mAudioSrcFmt = mAudioTgtFmt = AV_SAMPLE_FMT_NONE;
-    mAudioSrcChannelLayout = mAudioTgtChannelLayout = 0;
+    mAudioSrcChannelLayout = mAudioTgtChannelLayout =
+        av_get_default_channel_layout(mAudioSrcChannels);
 }
 
 void SoftFFmpegAudio::initVorbisHdr() {
@@ -1006,8 +1007,6 @@ int32_t SoftFFmpegAudio::openDecoder() {
         ALOGE("ffmpeg audio decoder failed to find codec");
         return ERR_CODEC_NOT_FOUND;
     }
-
-    CHECK(isConfigured());
 
     setDefaultCtx(mCtx, mCtx->codec);
 
