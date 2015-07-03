@@ -100,7 +100,7 @@ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     int fast = 1;
 
     avctx->workaround_bugs   = 1;
-    avctx->lowres            = 1;
+    avctx->lowres            = 0;
     if(avctx->lowres > codec->max_lowres){
         ALOGW("The maximum value for lowres supported by the decoder is %d",
                 codec->max_lowres);
