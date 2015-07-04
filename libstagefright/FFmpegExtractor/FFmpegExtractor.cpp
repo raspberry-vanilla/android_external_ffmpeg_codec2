@@ -101,6 +101,8 @@ private:
     PacketQueue *mQueue;
 
     int64_t mFirstKeyPktTimestamp;
+    int64_t mLastPTS;
+    int64_t mTargetTime;
 
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegSource);
 };
@@ -179,9 +181,10 @@ sp<MetaData> FFmpegExtractor::getTrackMetaData(size_t index, uint32_t flags __un
     }
 
     /* Quick and dirty, just get a frame 1/4 in */
-    if (mFormatCtx->duration != AV_NOPTS_VALUE) {
-        mTracks.itemAt(index).mMeta->setInt64(
-                kKeyThumbnailTime, mFormatCtx->duration / 4);
+    if (mTracks.itemAt(index).mIndex == mVideoStreamIdx) {
+        int64_t thumb_ts = av_rescale_q((mFormatCtx->streams[mVideoStreamIdx]->duration / 4),
+                mFormatCtx->streams[mVideoStreamIdx]->time_base, AV_TIME_BASE_Q);
+        mTracks.itemAt(index).mMeta->setInt64(kKeyThumbnailTime, thumb_ts);
     }
 
     return mTracks.itemAt(index).mMeta;
@@ -521,7 +524,7 @@ void FFmpegExtractor::setDurationMetaData(AVStream *stream, sp<MetaData> &meta)
     AVCodecContext *avctx = stream->codec;
 
     if (stream->duration != AV_NOPTS_VALUE) {
-        int64_t duration = stream->duration * av_q2d(stream->time_base) * 1000000;
+        int64_t duration = av_rescale_q(stream->duration, stream->time_base, AV_TIME_BASE_Q);
         printTime(duration);
         const char *s = av_get_media_type_string(avctx->codec_type);
         if (stream->start_time != AV_NOPTS_VALUE) {
@@ -754,7 +757,7 @@ int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type,
         packet_queue_flush(&mVideoQ);
 
     mSeekIdx = media_type == AVMEDIA_TYPE_VIDEO ? mVideoStreamIdx : mAudioStreamIdx;
-    mSeekPos = av_rescale_q(pos, AV_TIME_BASE_Q, mFormatCtx->streams[mSeekIdx]->time_base);
+    mSeekPos = pos;
 
     //mSeekFlags &= ~AVSEEK_FLAG_BYTE;
     //if (mSeekByBytes) {
@@ -766,13 +769,17 @@ int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type,
             mSeekMin = INT64_MIN;
             mSeekMax = mSeekPos;
             break;
+        case MediaSource::ReadOptions::SEEK_NEXT_SYNC:
+            mSeekMin = mSeekPos;
+            mSeekMax = INT64_MAX;
+            break;
         case MediaSource::ReadOptions::SEEK_CLOSEST_SYNC:
             mSeekMin = INT64_MIN;
             mSeekMax = INT64_MAX;
             break;
-        case MediaSource::ReadOptions::SEEK_NEXT_SYNC:
-            mSeekMin = mSeekPos;
-            mSeekMax = INT64_MAX;
+        case MediaSource::ReadOptions::SEEK_CLOSEST:
+            mSeekMin = INT64_MIN;
+            mSeekMax = mSeekPos;
             break;
         default:
             TRESPASS();
@@ -845,7 +852,6 @@ void FFmpegExtractor::setFFmpegDefaultOpts()
     mEOF          = false;
 
     mSeekIdx      = -1;
-    mSeekMode     = MediaSource::ReadOptions::SEEK_CLOSEST_SYNC;
 }
 
 int FFmpegExtractor::initStreams()
@@ -1102,7 +1108,7 @@ void FFmpegExtractor::readerEntry() {
         if (mSeekIdx >= 0) {
             Mutex::Autolock _l(mLock);
             ALOGV("readerEntry, mSeekIdx: %d mSeekPos: %lld (%lld/%lld)", mSeekIdx, mSeekPos, mSeekMin, mSeekMax);
-            ret = avformat_seek_file(mFormatCtx, mSeekIdx, mSeekMin, mSeekPos, mSeekMax, AVSEEK_FLAG_BACKWARD);
+            ret = avformat_seek_file(mFormatCtx, -1, mSeekMin, mSeekPos, mSeekMax, 0);
             if (ret < 0) {
                 ALOGE("%s: error while seeking", mFormatCtx->filename);
             } else {
@@ -1253,7 +1259,9 @@ FFmpegSource::FFmpegSource(
       mIsAVC(false),
       mNal2AnnexB(false),
       mStream(mExtractor->mTracks.itemAt(index).mStream),
-      mQueue(mExtractor->mTracks.itemAt(index).mQueue) {
+      mQueue(mExtractor->mTracks.itemAt(index).mQueue),
+      mLastPTS(AV_NOPTS_VALUE),
+      mTargetTime(AV_NOPTS_VALUE) {
     sp<MetaData> meta = mExtractor->mTracks.itemAt(index).mMeta;
 
     {
@@ -1324,13 +1332,18 @@ status_t FFmpegSource::read(
     int key = 0;
     status_t status = OK;
 
+    int64_t startTimeUs = mStream->start_time == AV_NOPTS_VALUE ? 0 :
+        av_rescale_q(mStream->start_time, mStream->time_base, AV_TIME_BASE_Q);
+
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
-        ALOGV("~~~%s seekTimeUs: %lld, mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, mode);
+        int64_t seekPTS = seekTimeUs;
+        ALOGV("~~~%s seekTimeUs: %lld, seekPTS: %lld, mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, seekPTS, mode);
         /* add the stream start time */
-        if (mStream->start_time != AV_NOPTS_VALUE)
-            seekTimeUs += mStream->start_time * av_q2d(mStream->time_base) * 1000000;
-        ALOGV("~~~%s seekTimeUs[+startTime]: %lld, mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, mode);
-        seeking = (mExtractor->stream_seek(seekTimeUs, mMediaType, mode) == SEEK);
+        if (mStream->start_time != AV_NOPTS_VALUE) {
+            seekPTS += startTimeUs;
+        }
+        ALOGV("~~~%s seekTimeUs[+startTime]: %lld, mode: %d start_time=%lld", av_get_media_type_string(mMediaType), seekPTS, mode, startTimeUs);
+        seeking = (mExtractor->stream_seek(seekPTS, mMediaType, mode) == SEEK);
     }
 
 retry:
@@ -1406,16 +1419,24 @@ retry:
         memcpy(mediaBuffer->data(), pkt.data, pkt.size);
     }
 
-    int64_t start_time = mStream->start_time != AV_NOPTS_VALUE ? mStream->start_time : 0;
     if (pktTS != AV_NOPTS_VALUE)
-        timeUs = (pktTS - start_time) * av_q2d(mStream->time_base) * 1000000;
+        timeUs = av_rescale_q(pktTS, mStream->time_base, AV_TIME_BASE_Q) - startTimeUs;
     else
         timeUs = SF_NOPTS_VALUE; //FIXME AV_NOPTS_VALUE is negative, but stagefright need positive
+
+    // predict the next PTS to use for exact-frame seek below
+    int64_t nextPTS = AV_NOPTS_VALUE;
+    if (mLastPTS != AV_NOPTS_VALUE && timeUs > mLastPTS) {
+        nextPTS = timeUs + (timeUs - mLastPTS);
+        mLastPTS = timeUs;
+    } else if (mLastPTS == AV_NOPTS_VALUE) {
+        mLastPTS = timeUs;
+    }
 
 #if DEBUG_PKT
     if (pktTS != AV_NOPTS_VALUE)
         ALOGV("read %s pkt, size:%d, key:%d, pktPTS: %lld, pts:%lld, dts:%lld, timeUs[-startTime]:%lld us (%.2f secs) start_time=%lld",
-            av_get_media_type_string(mMediaType), pkt.size, key, pktTS, pkt.pts, pkt.dts, timeUs, timeUs/1E6, start_time);
+            av_get_media_type_string(mMediaType), pkt.size, key, pktTS, pkt.pts, pkt.dts, timeUs, timeUs/1E6, startTimeUs);
     else
         ALOGV("read %s pkt, size:%d, key:%d, pts:N/A, dts:N/A, timeUs[-startTime]:N/A",
             av_get_media_type_string(mMediaType), pkt.size, key);
@@ -1423,6 +1444,23 @@ retry:
 
     mediaBuffer->meta_data()->setInt64(kKeyTime, timeUs);
     mediaBuffer->meta_data()->setInt32(kKeyIsSyncFrame, key);
+
+    // deal with seek-to-exact-frame, we might be off a bit and Stagefright will assert on us
+    if (seekTimeUs != AV_NOPTS_VALUE && timeUs < seekTimeUs &&
+            mode == MediaSource::ReadOptions::SEEK_CLOSEST) {
+        mTargetTime = seekTimeUs;
+        mediaBuffer->meta_data()->setInt64(kKeyTargetTime, seekTimeUs);
+    }
+
+    if (mTargetTime != AV_NOPTS_VALUE) {
+        if (timeUs == mTargetTime) {
+            mTargetTime = AV_NOPTS_VALUE;
+        } else if (nextPTS != AV_NOPTS_VALUE && nextPTS > mTargetTime) {
+            ALOGV("adjust target frame time to %lld", timeUs);
+            mediaBuffer->meta_data()->setInt64(kKeyTime, mTargetTime);
+            mTargetTime = AV_NOPTS_VALUE;
+        }
+    }
 
     *buffer = mediaBuffer;
 
