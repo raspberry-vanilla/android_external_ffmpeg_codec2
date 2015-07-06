@@ -24,6 +24,7 @@ extern "C" {
 
 #include "config.h"
 #include "libavcodec/xiph.h"
+#include "libavutil/intreadwrite.h"
 
 #ifdef __cplusplus
 }
@@ -149,8 +150,14 @@ sp<MetaData> setMPEG4Format(AVCodecContext *avctx)
 
     sp<MetaData> meta = new MetaData;
     meta->setData(kKeyESDS, kTypeESDS, esds->data(), esds->size());
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
 
+    int divxVersion = getDivXVersion(avctx);
+    if (divxVersion >= 0) {
+        meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_DIVX);
+        meta->setInt32(kKeyDivXVersion, divxVersion);
+    } else {
+        meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
+    }
     return meta;
 }
 
@@ -278,7 +285,7 @@ sp<MetaData> setHEVCFormat(AVCodecContext *avctx)
 
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta->setData(kKeyHVCC, 0, avctx->extradata, avctx->extradata_size);
 
     return meta;
 }
@@ -516,6 +523,25 @@ status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
     }
 
     return status;
+}
+
+int getDivXVersion(AVCodecContext *avctx)
+{
+    if (avctx->codec_tag == AV_RL32("DIV3")
+            || avctx->codec_tag == AV_RL32("div3")
+            || avctx->codec_tag == AV_RL32("DIV4")
+            || avctx->codec_tag == AV_RL32("div4")) {
+        return kTypeDivXVer_3_11;
+    }
+    if (avctx->codec_tag == AV_RL32("DIVX")
+            || avctx->codec_tag == AV_RL32("divx")) {
+        return kTypeDivXVer_4;
+    }
+    if (avctx->codec_tag == AV_RL32("DX50")
+           || avctx->codec_tag == AV_RL32("dx50")) {
+        return kTypeDivXVer_5;
+    }
+    return -1;
 }
 
 }  // namespace android

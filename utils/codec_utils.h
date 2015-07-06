@@ -64,6 +64,8 @@ sp<MetaData> setFLACFormat(AVCodecContext *avctx);
 status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
         uint8_t *src, size_t src_size, size_t nal_len_size);
 
+int getDivXVersion(AVCodecContext *avctx);
+
 }  // namespace android
 
 #endif  // CODEC_UTILS_H_

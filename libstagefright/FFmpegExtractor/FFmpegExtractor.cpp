@@ -1495,9 +1495,10 @@ static formatmap FILE_FORMATS[] = {
         {"ogg",                     MEDIA_MIMETYPE_CONTAINER_OGG      },
         {"vc1",                     MEDIA_MIMETYPE_CONTAINER_VC1      },
         {"hevc",                    MEDIA_MIMETYPE_CONTAINER_HEVC     },
+        {"divx",                    MEDIA_MIMETYPE_CONTAINER_DIVX     },
 };
 
-static enum AVCodecID getCodecId(AVFormatContext *ic, AVMediaType codec_type)
+static AVCodecContext* getCodecContext(AVFormatContext *ic, AVMediaType codec_type)
 {
     unsigned int idx = 0;
     AVCodecContext *avctx = NULL;
@@ -1513,11 +1514,17 @@ static enum AVCodecID getCodecId(AVFormatContext *ic, AVMediaType codec_type)
 
         avctx = ic->streams[idx]->codec;
         if (avctx->codec_type == codec_type) {
-            return avctx->codec_id;
+            return avctx;
         }
     }
 
-    return AV_CODEC_ID_NONE;
+    return NULL;
+}
+
+static enum AVCodecID getCodecId(AVFormatContext *ic, AVMediaType codec_type)
+{
+    AVCodecContext *avctx = getCodecContext(ic, codec_type);
+    return avctx == NULL ? AV_CODEC_ID_NONE : avctx->codec_id;
 }
 
 static bool hasAudioCodecOnly(AVFormatContext *ic)
@@ -1749,52 +1756,54 @@ static void adjustContainerIfNeeded(const char **mime, AVFormatContext *ic)
     const char *newMime = *mime;
     enum AVCodecID codec_id = AV_CODEC_ID_NONE;
 
-    if (!hasAudioCodecOnly(ic)) {
-        return;
-    }
+    AVCodecContext *avctx = getCodecContext(ic, AVMEDIA_TYPE_VIDEO);
+    if (avctx != NULL && getDivXVersion(avctx) >= 0) {
+        newMime = MEDIA_MIMETYPE_VIDEO_DIVX;
 
-    codec_id = getCodecId(ic, AVMEDIA_TYPE_AUDIO);
-    CHECK(codec_id != AV_CODEC_ID_NONE);
-    switch (codec_id) {
-    case AV_CODEC_ID_MP3:
-        newMime = MEDIA_MIMETYPE_AUDIO_MPEG;
-        break;
-    case AV_CODEC_ID_AAC:
-        newMime = MEDIA_MIMETYPE_AUDIO_AAC;
-        break;
-    case AV_CODEC_ID_VORBIS:
-        newMime = MEDIA_MIMETYPE_AUDIO_VORBIS;
-        break;
-    case AV_CODEC_ID_FLAC:
-        newMime = MEDIA_MIMETYPE_AUDIO_FLAC;
-        break;
-    case AV_CODEC_ID_AC3:
-        newMime = MEDIA_MIMETYPE_AUDIO_AC3;
-        break;
-    case AV_CODEC_ID_APE:
-        newMime = MEDIA_MIMETYPE_AUDIO_APE;
-        break;
-    case AV_CODEC_ID_DTS:
-        newMime = MEDIA_MIMETYPE_AUDIO_DTS;
-        break;
-    case AV_CODEC_ID_MP2:
-        newMime = MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II;
-        break;
-    case AV_CODEC_ID_COOK:
-        newMime = MEDIA_MIMETYPE_AUDIO_RA;
-        break;
-    case AV_CODEC_ID_WMAV1:
-    case AV_CODEC_ID_WMAV2:
-    case AV_CODEC_ID_WMAPRO:
-    case AV_CODEC_ID_WMALOSSLESS:
-        newMime = MEDIA_MIMETYPE_AUDIO_WMA;
-        break;
-    default:
-        break;
-    }
+    } else if (hasAudioCodecOnly(ic)) {
+        codec_id = getCodecId(ic, AVMEDIA_TYPE_AUDIO);
+        CHECK(codec_id != AV_CODEC_ID_NONE);
+        switch (codec_id) {
+        case AV_CODEC_ID_MP3:
+            newMime = MEDIA_MIMETYPE_AUDIO_MPEG;
+            break;
+        case AV_CODEC_ID_AAC:
+            newMime = MEDIA_MIMETYPE_AUDIO_AAC;
+            break;
+        case AV_CODEC_ID_VORBIS:
+            newMime = MEDIA_MIMETYPE_AUDIO_VORBIS;
+            break;
+        case AV_CODEC_ID_FLAC:
+            newMime = MEDIA_MIMETYPE_AUDIO_FLAC;
+            break;
+        case AV_CODEC_ID_AC3:
+            newMime = MEDIA_MIMETYPE_AUDIO_AC3;
+            break;
+        case AV_CODEC_ID_APE:
+            newMime = MEDIA_MIMETYPE_AUDIO_APE;
+            break;
+        case AV_CODEC_ID_DTS:
+            newMime = MEDIA_MIMETYPE_AUDIO_DTS;
+            break;
+        case AV_CODEC_ID_MP2:
+            newMime = MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II;
+            break;
+        case AV_CODEC_ID_COOK:
+            newMime = MEDIA_MIMETYPE_AUDIO_RA;
+            break;
+        case AV_CODEC_ID_WMAV1:
+        case AV_CODEC_ID_WMAV2:
+        case AV_CODEC_ID_WMAPRO:
+        case AV_CODEC_ID_WMALOSSLESS:
+            newMime = MEDIA_MIMETYPE_AUDIO_WMA;
+            break;
+        default:
+            break;
+        }
 
-    if (!strcmp(*mime, MEDIA_MIMETYPE_CONTAINER_FFMPEG)) {
-        newMime = MEDIA_MIMETYPE_AUDIO_FFMPEG;
+        if (!strcmp(*mime, MEDIA_MIMETYPE_CONTAINER_FFMPEG)) {
+            newMime = MEDIA_MIMETYPE_AUDIO_FFMPEG;
+        }
     }
 
     if (strcmp(*mime, newMime)) {
