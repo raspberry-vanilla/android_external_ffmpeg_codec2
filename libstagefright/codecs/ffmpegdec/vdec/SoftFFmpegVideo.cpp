@@ -524,27 +524,32 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     int64_t pts = AV_NOPTS_VALUE;
     uint8_t *dst = outHeader->pBuffer;
 
+    uint32_t width = outputBufferWidth();
+    uint32_t height = outputBufferHeight();
+
     memset(&pict, 0, sizeof(AVPicture));
     pict.data[0] = dst;
-    pict.data[1] = dst + mWidth * mHeight;
-    pict.data[2] = pict.data[1] + (mWidth / 2  * mHeight / 2);
-    pict.linesize[0] = mWidth;
-    pict.linesize[1] = mWidth / 2;
-    pict.linesize[2] = mWidth / 2;
+    pict.data[1] = dst + width * height;
+    pict.data[2] = pict.data[1] + (width / 2  * height / 2);
+    pict.linesize[0] = width;
+    pict.linesize[1] = width / 2;
+    pict.linesize[2] = width / 2;
+
+    ALOGV("drainOneOutputBuffer: frame_width=%d frame_height=%d width=%d height=%d ctx_width=%d ctx_height=%d", mFrame->width, mFrame->height, width, height, mCtx->width, mCtx->height);
 
     int sws_flags = SWS_BICUBIC;
     mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
-           mCtx->width, mCtx->height, (AVPixelFormat)mFrame->format, mWidth, mHeight,
+           mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format, width, height,
            PIX_FMT_YUV420P, sws_flags, NULL, NULL, NULL);
     if (mImgConvertCtx == NULL) {
         ALOGE("Cannot initialize the conversion context");
         return ERR_SWS_FAILED;
     }
     sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
-            0, mHeight, pict.data, pict.linesize);
+            0, height, pict.data, pict.linesize);
 
     outHeader->nOffset = 0;
-    outHeader->nFilledLen = (mWidth * mHeight * 3) / 2;
+    outHeader->nFilledLen = (width * height * 3) / 2;
     outHeader->nFlags = 0;
     if (mFrame->key_frame) {
         outHeader->nFlags |= OMX_BUFFERFLAG_SYNCFRAME;
@@ -628,6 +633,27 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
     }
 }
 
+bool SoftFFmpegVideo::handlePortSettingsChange() {
+    CropSettingsMode crop = kCropUnSet;
+    uint32_t width  = outputBufferWidth();
+    uint32_t height = outputBufferHeight();
+    if (width != mCtx->width || height != mCtx->height) {
+        crop = kCropSet;
+        if (mCropWidth != width || mCropHeight != height) {
+            mCropLeft = 0;
+            mCropTop = 0;
+            mCropWidth = width;
+            mCropHeight = height;
+            crop = kCropChanged;
+        }
+    }
+
+    bool portWillReset = false;
+    SoftVideoDecoderOMXComponent::handlePortSettingsChange(
+            &portWillReset, mCtx->width, mCtx->height, crop);
+    return portWillReset;
+}
+
 void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
     if (mSignalledError || mOutputPortSettingsChange != NONE) {
         return;
@@ -692,9 +718,8 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
             CHECK_EQ(err, ERR_OK);
         }
 
-        bool portWillReset = false;
-        handlePortSettingsChange(&portWillReset, mCtx->width, mCtx->height);
-        if (portWillReset) {
+        if (handlePortSettingsChange()) {
+            ALOGV("PORT RESET w=%d h=%d", mCtx->width, mCtx->height);
             return;
         }
 
@@ -719,10 +744,8 @@ void SoftFFmpegVideo::onPortFlushCompleted(OMX_U32 portIndex) {
 }
 
 void SoftFFmpegVideo::onReset() {
+    ALOGV("onReset()");
     SoftVideoDecoderOMXComponent::onReset();
-    mFFmpegAlreadyInited = false;
-    mCodecAlreadyOpened = false;
-    mCtx = NULL;
     mSignalledError = false;
     mExtradataReady = false;
 }

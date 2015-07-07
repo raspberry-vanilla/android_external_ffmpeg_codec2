@@ -106,6 +106,7 @@ private:
     int32_t  drainOneOutputBuffer();
     void     drainEOSOutputBuffer();
     void     drainAllOutputBuffers();
+    bool     handlePortSettingsChange();
 
     DISALLOW_EVIL_CONSTRUCTORS(SoftFFmpegVideo);
 };
