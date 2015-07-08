@@ -4,25 +4,34 @@ include $(CLEAR_VARS)
 include external/ffmpeg/android/ffmpeg.mk
 
 LOCAL_SRC_FILES := \
-	FFmpegExtractor.cpp
+	FFmpegOMXPlugin.cpp \
+	SoftFFmpegAudio.cpp \
+	SoftFFmpegVideo.cpp
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../.. \
+	$(LOCAL_PATH)/../include \
+	$(LOCAL_PATH)/.. \
+	$(TOP)/frameworks/native/include/media/hardware \
 	$(TOP)/frameworks/native/include/media/openmax \
 	$(TOP)/frameworks/av/include \
-	$(TOP)/frameworks/av/media/libstagefright
+	$(TOP)/frameworks/av/media/libstagefright \
+	$(TOP)/frameworks/av/media/libstagefright/include
 
 LOCAL_SHARED_LIBRARIES := \
+	libdl             \
 	libutils          \
 	libcutils         \
-	libavcodec        \
-	libavformat       \
-	libavutil         \
+	libavcodec		  \
+	libavformat		  \
+	libavutil		  \
 	libffmpeg_utils   \
+	libswresample     \
+	libswscale        \
 	libstagefright    \
-	libstagefright_foundation
+	libstagefright_foundation \
+	libstagefright_omx
 
-LOCAL_MODULE:= libFFmpegExtractor
+LOCAL_MODULE:= libffmpeg_omx
 
 LOCAL_MODULE_TAGS := optional
 
@@ -37,3 +46,5 @@ LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
 #endif
 
 include $(BUILD_SHARED_LIBRARY)
+
+include $(call first-makefiles-under,$(LOCAL_PATH))

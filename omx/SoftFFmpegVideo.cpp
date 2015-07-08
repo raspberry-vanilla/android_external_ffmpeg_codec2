@@ -20,6 +20,7 @@
 #include <utils/Log.h>
 
 #include "SoftFFmpegVideo.h"
+#include "FFmpegComponents.h"
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -32,28 +33,6 @@
 static int decoder_reorder_pts = -1;
 
 namespace android {
-
-static const struct VideoCodingMapEntry {
-    const char *mMime;
-    OMX_VIDEO_CODINGTYPE mVideoCodingType;
-    const char *mRole;
-    enum AVCodecID mCodecID;
-} kVideoCodingMapEntry[] = {
-    { "OMX.ffmpeg.h264.decoder", OMX_VIDEO_CodingAVC, "video_decoder.avc", AV_CODEC_ID_H264 },
-    { "OMX.ffmpeg.hevc.decoder", OMX_VIDEO_CodingHEVC, "video_decoder.hevc", AV_CODEC_ID_HEVC },
-    { "OMX.ffmpeg.mpeg4.decoder", OMX_VIDEO_CodingMPEG4, "video_decoder.mpeg4", AV_CODEC_ID_MPEG4 },
-    { "OMX.ffmpeg.h263.decoder", OMX_VIDEO_CodingH263, "video_decoder.h263", AV_CODEC_ID_H263 },
-    { "OMX.ffmpeg.mpeg2.decoder", OMX_VIDEO_CodingMPEG2, "video_decoder.mpeg2", AV_CODEC_ID_MPEG2VIDEO },
-    { "OMX.ffmpeg.vp8.decoder", OMX_VIDEO_CodingVP8, "video_decoder.vp8", AV_CODEC_ID_VP8 },
-    { "OMX.ffmpeg.vp9.decoder", OMX_VIDEO_CodingVP9, "video_decoder.vp9", AV_CODEC_ID_VP9 },
-    { "OMX.ffmpeg.wmv.decoder", OMX_VIDEO_CodingWMV, "video_decoder.wmv", AV_CODEC_ID_WMV2 },
-    { "OMX.ffmpeg.rv.decoder", OMX_VIDEO_CodingRV, "video_decoder.rv", AV_CODEC_ID_RV40 },
-    { "OMX.ffmpeg.flv1.decoder", OMX_VIDEO_CodingFLV1, "video_decoder.flv1", AV_CODEC_ID_FLV1 },
-    { "OMX.ffmpeg.divx.decoder", OMX_VIDEO_CodingDIVX, "video_decoder.divx", AV_CODEC_ID_MPEG4 },
-    { "OMX.ffmpeg.vc1.decoder", OMX_VIDEO_CodingVC1, "video_decoder.vc1", AV_CODEC_ID_VC1 },
-    { "OMX.ffmpeg.wmv.decoder", OMX_VIDEO_CodingWMV, "video_decoder.vc1", AV_CODEC_ID_VC1 },
-    { "OMX.ffmpeg.vtrial.decoder", OMX_VIDEO_CodingAutoDetect, "video_decoder.trial", AV_CODEC_ID_NONE },
-};
 
 SoftFFmpegVideo::SoftFFmpegVideo(
         const char *name,
@@ -200,8 +179,12 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalGetParameter(
             return OMX_ErrorNone;
         }
 
-        case OMX_IndexParamVideoFFmpeg:
+        default:
         {
+            if (index != (OMX_INDEXTYPE)OMX_IndexParamVideoFFmpeg) {
+                return SoftVideoDecoderOMXComponent::internalGetParameter(index, params);
+            }
+
             OMX_VIDEO_PARAM_FFMPEGTYPE *profile =
                 (OMX_VIDEO_PARAM_FFMPEGTYPE *)params;
 
@@ -215,20 +198,17 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalGetParameter(
 
             return OMX_ErrorNone;
         }
-
-        default:
-            return SoftVideoDecoderOMXComponent::internalGetParameter(index, params);
     }
 }
 
 OMX_ERRORTYPE SoftFFmpegVideo::isRoleSupported(
                 const OMX_PARAM_COMPONENTROLETYPE *roleParams) {
     for (size_t i = 0;
-         i < sizeof(kVideoCodingMapEntry) / sizeof(kVideoCodingMapEntry[0]);
+         i < sizeof(kVideoComponents) / sizeof(kVideoComponents[0]);
          ++i) {
-        if (mCodingType == kVideoCodingMapEntry[i].mVideoCodingType &&
+        if (mCodingType == kVideoComponents[i].mVideoCodingType &&
             strncmp((const char *)roleParams->cRole,
-                kVideoCodingMapEntry[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
+                kVideoComponents[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
             return OMX_ErrorNone;
         }
     }
@@ -329,8 +309,12 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
             return OMX_ErrorNone;
         }
 
-        case OMX_IndexParamVideoFFmpeg:
+        default:
         {
+            if (index != (OMX_INDEXTYPE)OMX_IndexParamVideoFFmpeg) {
+                return SoftVideoDecoderOMXComponent::internalSetParameter(index, params);
+            }
+
             OMX_VIDEO_PARAM_FFMPEGTYPE *profile =
                 (OMX_VIDEO_PARAM_FFMPEGTYPE *)params;
 
@@ -351,10 +335,6 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
 
             return OMX_ErrorNone;
         }
-
-        default:
-
-            return SoftVideoDecoderOMXComponent::internalSetParameter(index, params);
     }
 }
 
@@ -637,7 +617,7 @@ bool SoftFFmpegVideo::handlePortSettingsChange() {
     CropSettingsMode crop = kCropUnSet;
     uint32_t width  = outputBufferWidth();
     uint32_t height = outputBufferHeight();
-    if (width != mCtx->width || height != mCtx->height) {
+    if (width != (uint32_t)mCtx->width || height != (uint32_t)mCtx->height) {
         crop = kCropSet;
         if (mCropWidth != width || mCropHeight != height) {
             mCropLeft = 0;
@@ -750,9 +730,7 @@ void SoftFFmpegVideo::onReset() {
     mExtradataReady = false;
 }
 
-}  // namespace android
-
-android::SoftOMXComponent *createSoftOMXComponent(
+SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
 
@@ -760,13 +738,11 @@ android::SoftOMXComponent *createSoftOMXComponent(
     char *componentRole = NULL;
     enum AVCodecID codecID = AV_CODEC_ID_NONE;
 
-    for (size_t i = 0;
-         i < sizeof(android::kVideoCodingMapEntry) / sizeof(android::kVideoCodingMapEntry[0]);
-         ++i) {
-        if (!strcasecmp(name, android::kVideoCodingMapEntry[i].mMime)) {
-            componentRole = strdup(android::kVideoCodingMapEntry[i].mRole);
-            codingType = android::kVideoCodingMapEntry[i].mVideoCodingType;
-            codecID = android::kVideoCodingMapEntry[i].mCodecID;
+    for (size_t i = 0; i < kNumVideoComponents; ++i) {
+        if (!strcasecmp(name, kVideoComponents[i].mName)) {
+            componentRole = strdup(kVideoComponents[i].mRole);
+            codingType = kVideoComponents[i].mVideoCodingType;
+            codecID = kVideoComponents[i].mCodecID;
             break;
         }
     }
@@ -775,7 +751,8 @@ android::SoftOMXComponent *createSoftOMXComponent(
         TRESPASS();
     }
 
-    return new android::SoftFFmpegVideo(name, componentRole, codingType,
+    return new SoftFFmpegVideo(name, componentRole, codingType,
                                         callbacks, appData, component, codecID);
 }
 
+}  // namespace android

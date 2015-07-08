@@ -4,33 +4,33 @@ include $(CLEAR_VARS)
 include external/ffmpeg/android/ffmpeg.mk
 
 LOCAL_SRC_FILES := \
-	SoftFFmpegVideo.cpp
+	FFmpegExtractor.cpp
 
 LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../../../.. \
-	$(TOP)/frameworks/av/media/libstagefright/include \
-	$(TOP)/frameworks/native/include/media/openmax
+	$(LOCAL_PATH)/.. \
+	$(TOP)/frameworks/native/include/media/openmax \
+	$(TOP)/frameworks/av/include \
+	$(TOP)/frameworks/av/media/libstagefright
 
 LOCAL_SHARED_LIBRARIES := \
 	libutils          \
 	libcutils         \
-	libavutil         \
 	libavcodec        \
-	libswscale        \
+	libavformat       \
+	libavutil         \
 	libffmpeg_utils   \
 	libstagefright    \
-	libstagefright_omx \
-	libstagefright_foundation \
-	libstagefright_soft_ffmpegadec
+	libstagefright_foundation
 
-LOCAL_MODULE := libstagefright_soft_ffmpegvdec
+LOCAL_MODULE:= libffmpeg_extractor
+
 LOCAL_MODULE_TAGS := optional
 
 ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
-    LOCAL_CFLAGS += -Wno-psabi
+	LOCAL_CFLAGS += -Wno-psabi
 endif
 
-LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1
+LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
 
 #ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
 #	LOCAL_CFLAGS += -fpermissive

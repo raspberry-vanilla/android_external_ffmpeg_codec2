@@ -21,6 +21,7 @@
 #include <cutils/properties.h>
 
 #include "SoftFFmpegAudio.h"
+#include "FFmpegComponents.h"
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/hexdump.h>
@@ -43,25 +44,6 @@ static void InitOMXParams(T *params) {
     params->nVersion.s.nRevision = 0;
     params->nVersion.s.nStep = 0;
 }
-
-static const struct AudioCodingMapEntry {
-    const char *mComponent;
-    OMX_AUDIO_CODINGTYPE mAudioCodingType;
-    const char *mRole;
-    enum AVCodecID mCodecID;
-} kAudioCodingMapEntry[] = {
-    { "OMX.ffmpeg.aac.decoder", OMX_AUDIO_CodingAAC, "audio_decoder.aac", AV_CODEC_ID_AAC },
-    { "OMX.ffmpeg.mp3.decoder", OMX_AUDIO_CodingMP3, "audio_decoder.mp3", AV_CODEC_ID_MP3 },
-    { "OMX.ffmpeg.vorbis.decoder", OMX_AUDIO_CodingVORBIS, "audio_decoder.vorbis", AV_CODEC_ID_VORBIS },
-    { "OMX.ffmpeg.wma.decoder", OMX_AUDIO_CodingWMA, "audio_decoder.wma", AV_CODEC_ID_WMAV2 },
-    { "OMX.ffmpeg.flac.decoder", OMX_AUDIO_CodingFLAC, "audio_decoder.flac", AV_CODEC_ID_FLAC },
-    { "OMX.ffmpeg.mp2.decoder", OMX_AUDIO_CodingMP2, "audio_decoder.mp2", AV_CODEC_ID_MP2 },
-    { "OMX.ffmpeg.ac3.decoder", OMX_AUDIO_CodingAC3, "audio_decoder.ac3", AV_CODEC_ID_AC3 },
-    { "OMX.ffmpeg.ape.decoder", OMX_AUDIO_CodingAPE, "audio_decoder.ape", AV_CODEC_ID_APE },
-    { "OMX.ffmpeg.dts.decoder", OMX_AUDIO_CodingDTS, "audio_decoder.dts", AV_CODEC_ID_DTS },
-    { "OMX.ffmpeg.ra.decoder", OMX_AUDIO_CodingRA, "audio_decoder.ra", AV_CODEC_ID_COOK },
-    { "OMX.ffmpeg.atrial.decoder", OMX_AUDIO_CodingAutoDetect, "audio_decoder.trial", AV_CODEC_ID_NONE }
-};
 
 int64_t *SoftFFmpegAudio::sAudioClock;
 
@@ -121,9 +103,9 @@ void SoftFFmpegAudio::initPorts() {
     def.nBufferCountMin = kNumInputBuffers;
     def.nBufferCountActual = def.nBufferCountMin;
 
-    if (mCodingType == OMX_AUDIO_CodingAPE) {
+    if (mCodingType == (OMX_AUDIO_CODINGTYPE)OMX_AUDIO_CodingAPE) {
         def.nBufferSize = 1000000; // ape!
-    } else if (mCodingType == OMX_AUDIO_CodingDTS) {
+    } else if (mCodingType == (OMX_AUDIO_CODINGTYPE)OMX_AUDIO_CodingDTS) {
         def.nBufferSize = 1000000; // dts!
     } else {
         // max aggregated buffer size from nuplayer
@@ -544,12 +526,10 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
 OMX_ERRORTYPE SoftFFmpegAudio::isRoleSupported(
         const OMX_PARAM_COMPONENTROLETYPE *roleParams) {
-    for (size_t i = 0;
-         i < sizeof(kAudioCodingMapEntry) / sizeof(kAudioCodingMapEntry[0]);
-         ++i) {
-        if (mCodingType == kAudioCodingMapEntry[i].mAudioCodingType &&
+    for (size_t i = 0; i < kNumAudioComponents; i++) {
+        if (mCodingType == kAudioComponents[i].mAudioCodingType &&
             strncmp((const char *)roleParams->cRole,
-                kAudioCodingMapEntry[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
+                kAudioComponents[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
             return OMX_ErrorNone;
         }
     }
@@ -1516,26 +1496,24 @@ void SoftFFmpegAudio::onReset() {
     mOutputPortSettingsChange = NONE;
 }
 
-}  // namespace android
-
-android::SoftOMXComponent *createSoftOMXComponent(
+SoftOMXComponent* SoftFFmpegAudio::createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
     OMX_AUDIO_CODINGTYPE codingType = OMX_AUDIO_CodingAutoDetect;
     char *componentRole = NULL;
     enum AVCodecID codecID = AV_CODEC_ID_NONE;
 
-    for (size_t i = 0;
-            i < sizeof(android::kAudioCodingMapEntry) / sizeof(android::kAudioCodingMapEntry[0]);
-            ++i) {
-        if (!strcasecmp(name, android::kAudioCodingMapEntry[i].mComponent)) {
-            componentRole = strdup(android::kAudioCodingMapEntry[i].mRole);
-            codingType = android::kAudioCodingMapEntry[i].mAudioCodingType;
-            codecID = android::kAudioCodingMapEntry[i].mCodecID;
+    for (size_t i = 0; i < kNumAudioComponents; ++i) {
+        if (!strcasecmp(name, kAudioComponents[i].mName)) {
+            componentRole = strdup(kAudioComponents[i].mRole);
+            codingType = kAudioComponents[i].mAudioCodingType;
+            codecID = kAudioComponents[i].mCodecID;
             break;
          }
      }
 
-    return new android::SoftFFmpegAudio(name, componentRole, codingType, codecID,
+    return new SoftFFmpegAudio(name, componentRole, codingType, codecID,
             callbacks, appData, component);
 }
+
+}  // namespace android

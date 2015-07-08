@@ -34,6 +34,11 @@ struct SoftFFmpegVideo : public SoftVideoDecoderOMXComponent {
             OMX_COMPONENTTYPE **component,
             enum AVCodecID codecID);
 
+public:
+    static SoftOMXComponent* createSoftOMXComponent(
+            const char *name, const OMX_CALLBACKTYPE *callbacks,
+            OMX_PTR appData, OMX_COMPONENTTYPE **component);
+
 protected:
     virtual ~SoftFFmpegVideo();
 
