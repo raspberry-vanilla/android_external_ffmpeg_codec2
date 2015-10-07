@@ -185,6 +185,7 @@ static int android_close(URLContext *h)
     FFSource* ffs = (FFSource*)h->priv_data;
     ALOGV("android source close");
     delete ffs;
+    h->priv_data = NULL;
     return 0;
 }
 
@@ -197,7 +198,12 @@ static int android_check(URLContext *h, int mask)
 {
     FFSource* ffs = (FFSource*)h->priv_data;
 
-    if (ffs->init_check() < 0)
+    /* url_check does not guarantee url_open will be called
+     * (and actually it is not designed to do so)
+     * If url_open is not called before url_check called, ffs
+     * will be null, and we will assume everything is ok.
+     */
+    if (ffs && (ffs->init_check() < 0))
         return AVERROR(EACCES); // FIXME
 
     return (mask & AVIO_FLAG_READ);
