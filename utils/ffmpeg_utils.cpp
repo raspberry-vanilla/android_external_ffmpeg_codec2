@@ -555,5 +555,18 @@ int64_t get_timestamp() {
     return (int64_t)tv.tv_sec * 1000000 + tv.tv_usec;
 }
 
+audio_format_t to_android_audio_format(enum AVSampleFormat fmt) {
+    AVSampleFormat packed = av_get_packed_sample_fmt(fmt);
+    if (packed == AV_SAMPLE_FMT_U8)
+        return AUDIO_FORMAT_PCM_8_BIT;
+    if (packed == AV_SAMPLE_FMT_S16)
+        return AUDIO_FORMAT_PCM_16_BIT;
+    if (packed == AV_SAMPLE_FMT_S32)
+        return AUDIO_FORMAT_PCM_32_BIT;
+    if (packed == AV_SAMPLE_FMT_FLT)
+        return AUDIO_FORMAT_PCM_FLOAT;
+    return AUDIO_FORMAT_DEFAULT;
+}
+
 }  // namespace android
 

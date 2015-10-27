@@ -138,7 +138,6 @@ private:
         AWAITING_ENABLED
     } mOutputPortSettingsChange;
 
-    bool mHighResAudioEnabled;
     bool mReconfiguring;
 
     void setMode(const char *name);

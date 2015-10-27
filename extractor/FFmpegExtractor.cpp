@@ -509,10 +509,14 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
 
         meta->setInt32(kKeyChannelCount, avctx->channels);
         meta->setInt32(kKeyBitRate, avctx->bit_rate);
-        meta->setInt32(kKeyBitsPerSample, av_get_bytes_per_sample(avctx->sample_fmt) > 2 ? 24 : 16);
+        int32_t bits = avctx->bits_per_raw_sample > 0 ?
+                avctx->bits_per_raw_sample :
+                av_get_bytes_per_sample(avctx->sample_fmt) * 8;
+        meta->setInt32(kKeyBitsPerSample, bits > 0 ? bits : 16);
         meta->setInt32(kKeySampleRate, avctx->sample_rate);
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);
+        meta->setInt32('pfmt', to_android_audio_format(avctx->sample_fmt));
         setDurationMetaData(stream, meta);
     }
 

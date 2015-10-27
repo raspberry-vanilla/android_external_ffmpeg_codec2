@@ -50,6 +50,8 @@ extern "C" {
 #include "libavcodec/xiph.h"
 #include "libswresample/swresample.h"
 
+#include <system/audio.h>
+
 #ifdef __cplusplus
 }
 #endif
@@ -107,6 +109,8 @@ bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
         const uint8_t *header_start[3], const int header_len[3]);
 
 int64_t get_timestamp(void);
+
+audio_format_t to_android_audio_format(enum AVSampleFormat fmt);
 
 }  // namespace android
 

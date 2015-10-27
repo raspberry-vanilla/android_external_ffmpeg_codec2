@@ -75,12 +75,8 @@ SoftFFmpegAudio::SoftFFmpegAudio(
 
     setAudioClock(0);
 
-    char value[PROPERTY_VALUE_MAX] = {0};
-    property_get("audio.offload.24bit.enable", value, "1");
-    mHighResAudioEnabled = atoi(value);
-
-    ALOGD("SoftFFmpegAudio component: %s mCodingType: %d mHighResAudioEnabled: %d",
-            name, mCodingType, mHighResAudioEnabled);
+    ALOGD("SoftFFmpegAudio component: %s mCodingType: %d",
+            name, mCodingType);
 
     initPorts();
     CHECK_EQ(initDecoder(codecID), (status_t)OK);
@@ -280,9 +276,17 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->ePCMMode = OMX_AUDIO_PCMModeLinear;
 
             if (isConfigured()) {
-                profile->nBitPerSample = av_get_bytes_per_sample(mAudioTgtFmt) > 2 ? 24 : 16;
+                AVSampleFormat packed = av_get_packed_sample_fmt(mAudioTgtFmt);
+                if (packed == AV_SAMPLE_FMT_U8)
+                    profile->nBitPerSample = 8;
+                else if (packed == AV_SAMPLE_FMT_S16)
+                    profile->nBitPerSample = 16;
+                else if (packed == AV_SAMPLE_FMT_S32)
+                    profile->nBitPerSample = 24;
+                else
+                    profile->nBitPerSample = av_get_bytes_per_sample(mAudioTgtFmt) * 8;
             } else {
-                profile->nBitPerSample = mHighResAudioEnabled ? 24 : 16;
+                profile->nBitPerSample = 32;
             }
 
             if (getOMXChannelMapping(mAudioTgtChannels, profile->eChannelMapping) != OK) {
@@ -539,18 +543,13 @@ OMX_ERRORTYPE SoftFFmpegAudio::isRoleSupported(
 
 void SoftFFmpegAudio::adjustAudioParams() {
 
-    uint32_t max_rate = 48000;
+    uint32_t max_rate = 192000;
 
     mReconfiguring = isConfigured();
 
     // let android audio mixer to downmix if there is no multichannel output
     // and use number of channels from the source file, useful for HDMI/offload output
     mAudioTgtChannels = mCtx->channels;
-
-    // 4000 <= sampling rate <= 48000/192000
-    if (mHighResAudioEnabled) {
-        max_rate = 192000;
-    }
 
     mAudioTgtFreq = FFMIN(max_rate, FFMAX(8000, mCtx->sample_rate));
 
@@ -583,9 +582,12 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            if (mHighResAudioEnabled &&
-                    (profile->nBitPerSample > 16 || profile->nBitPerSample == 0)) {
+            if (profile->nBitPerSample == 24) {
                 mAudioTgtFmt = AV_SAMPLE_FMT_S32;
+            } else if (profile->nBitPerSample == 32) {
+                mAudioTgtFmt = AV_SAMPLE_FMT_FLT;
+            } else if (profile->nBitPerSample == 8) {
+                mAudioTgtFmt = AV_SAMPLE_FMT_U8;
             } else {
                 mAudioTgtFmt = AV_SAMPLE_FMT_S16;
             }
