@@ -35,6 +35,13 @@ LOCAL_MODULE:= libffmpeg_omx
 
 LOCAL_MODULE_TAGS := optional
 
+ifdef TARGET_2ND_ARCH
+LOCAL_MODULE_PATH_32 := $(TARGET_OUT_VENDOR)/lib
+LOCAL_MODULE_PATH_64 := $(TARGET_OUT_VENDOR)/lib64
+else
+LOCAL_MODULE_PATH := $(TARGET_OUT_VENDOR_SHARED_LIBRARIES)
+endif
+
 ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
 	LOCAL_CFLAGS += -Wno-psabi
 endif
