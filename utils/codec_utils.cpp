@@ -393,7 +393,7 @@ sp<MetaData> setAACFormat(AVCodecContext *avctx)
 
     sp<MetaData> meta = MakeAACCodecSpecificData(profile, sf_index, channel);
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
-
+    meta->setInt32(kKeyAACAOT, profile);
     return meta;
 }
 
