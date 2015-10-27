@@ -91,8 +91,6 @@ static const struct VideoCodingMapEntry {
         OMX_VIDEO_CodingAutoDetect, "video_decoder.trial", AV_CODEC_ID_NONE },
     { "OMX.ffmpeg.wmv.decoder",
         OMX_VIDEO_CodingWMV, "video_decoder.wmv", AV_CODEC_ID_WMV2 },
-    { "OMX.ffmpeg.wmv.decoder",
-        OMX_VIDEO_CodingWMV, "video_decoder.vc1", AV_CODEC_ID_VC1 },
 };
 
 static const size_t kNumAudioComponents =
