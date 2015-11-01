@@ -30,7 +30,7 @@ namespace android {
 
 struct ABuffer;
 struct AMessage;
-struct String8;
+class String8;
 struct FFmpegSource;
 
 struct FFmpegExtractor : public MediaExtractor {

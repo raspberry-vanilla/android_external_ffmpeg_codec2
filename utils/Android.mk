@@ -40,4 +40,6 @@ LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1
 #	LOCAL_CFLAGS += -fpermissive
 #endif
 
+LOCAL_CLANG := false
+
 include $(BUILD_SHARED_LIBRARY)

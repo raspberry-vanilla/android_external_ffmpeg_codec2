@@ -327,7 +327,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
             mCtx->height   = profile->nHeight;
 
             ALOGD("got OMX_IndexParamVideoFFmpeg, "
-                "eCodecId:%ld(%s), width:%lu, height:%lu",
+                "eCodecId:%d(%s), width:%u, height:%u",
                 profile->eCodecId,
                 avcodec_get_name(mCtx->codec_id),
                 profile->nWidth,
@@ -343,12 +343,12 @@ int32_t SoftFFmpegVideo::handleExtradata() {
     BufferInfo *inInfo = *inQueue.begin();
     OMX_BUFFERHEADERTYPE *inHeader = inInfo->mHeader;
 
-    ALOGI("got extradata, ignore: %d, size: %lu",
+    ALOGI("got extradata, ignore: %d, size: %u",
             mIgnoreExtradata, inHeader->nFilledLen);
     hexdump(inHeader->pBuffer + inHeader->nOffset, inHeader->nFilledLen);
 
     if (mIgnoreExtradata) {
-        ALOGI("got extradata, size: %lu, but ignore it", inHeader->nFilledLen);
+        ALOGI("got extradata, size: %u, but ignore it", inHeader->nFilledLen);
     } else {
         if (!mExtradataReady) {
             //if (mMode == MODE_H264)
@@ -529,7 +529,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
             0, height, pict.data, pict.linesize);
 
     outHeader->nOffset = 0;
-    outHeader->nFilledLen = (width * height * 3) / 2;
+    outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * 3) / 2;
     outHeader->nFlags = 0;
     if (mFrame->key_frame) {
         outHeader->nFlags |= OMX_BUFFERFLAG_SYNCFRAME;
@@ -712,7 +712,7 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
 }
 
 void SoftFFmpegVideo::onPortFlushCompleted(OMX_U32 portIndex) {
-    ALOGV("ffmpeg video decoder flush port(%lu)", portIndex);
+    ALOGV("ffmpeg video decoder flush port(%u)", portIndex);
     if (portIndex == kInputPortIndex) {
         if (mCtx) {
             //Make sure that the next buffer output does not still
