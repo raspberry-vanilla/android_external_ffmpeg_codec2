@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <stdlib.h>
+#include "ffmpeg_source.h"
 
 #include <media/stagefright/DataSource.h>
 
