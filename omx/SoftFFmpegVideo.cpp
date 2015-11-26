@@ -206,8 +206,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::isRoleSupported(
     for (size_t i = 0;
          i < sizeof(kVideoComponents) / sizeof(kVideoComponents[0]);
          ++i) {
-        if (mCodingType == kVideoComponents[i].mVideoCodingType &&
-            strncmp((const char *)roleParams->cRole,
+        if (strncmp((const char *)roleParams->cRole,
                 kVideoComponents[i].mRole, OMX_MAX_STRINGNAME_SIZE - 1) == 0) {
             return OMX_ErrorNone;
         }
