@@ -118,6 +118,8 @@ status_t SoftFFmpegVideo::initDecoder(enum AVCodecID codecID) {
     mCtx->codec_id = codecID;
     mCtx->extradata_size = 0;
     mCtx->extradata = NULL;
+    mCtx->width = mWidth;
+    mCtx->height = mHeight;
     return OK;
 }
 
