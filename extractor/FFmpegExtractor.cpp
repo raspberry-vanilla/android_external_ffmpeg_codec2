@@ -423,11 +423,33 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
     }
 
     if (meta != NULL) {
-        ALOGI("width: %d, height: %d, bit_rate: %d",
-                avctx->width, avctx->height, avctx->bit_rate);
+        float aspect_ratio;
+        int width, height;
+
+        if (avctx->sample_aspect_ratio.num == 0)
+            aspect_ratio = 0;
+        else
+            aspect_ratio = av_q2d(avctx->sample_aspect_ratio);
+
+        if (aspect_ratio <= 0.0)
+            aspect_ratio = 1.0;
+        aspect_ratio *= (float)avctx->width / (float)avctx->height;
+
+        /* XXX: we suppose the screen has a 1.0 pixel ratio */
+        height = avctx->height;
+        width = ((int)rint(height * aspect_ratio)) & ~1;
+
+        ALOGI("width: %d, height: %d, bit_rate: %d aspect ratio: %f",
+                avctx->width, avctx->height, avctx->bit_rate, aspect_ratio);
 
         meta->setInt32(kKeyWidth, avctx->width);
         meta->setInt32(kKeyHeight, avctx->height);
+        if ((width > 0) && (height > 0) &&
+            ((avctx->width != width || avctx->height != height))) {
+            meta->setInt32(kKeySARWidth, width);
+            meta->setInt32(kKeySARHeight, height);
+            ALOGI("SAR width: %d, SAR height: %d", width, height);
+        }
         if (avctx->bit_rate > 0) {
             meta->setInt32(kKeyBitRate, avctx->bit_rate);
         }
