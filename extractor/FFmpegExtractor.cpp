@@ -586,6 +586,9 @@ int FFmpegExtractor::stream_component_open(int stream_index)
     if (!supported) {
         ALOGE("unsupport the codec(%s)", avcodec_get_name(avctx->codec_id));
         return -1;
+    } else if (mFormatCtx->streams[stream_index]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+        ALOGD("not opening attached picture(%s)", avcodec_get_name(avctx->codec_id));
+        return -1;
     }
     ALOGI("support the codec(%s)", avcodec_get_name(avctx->codec_id));
 
