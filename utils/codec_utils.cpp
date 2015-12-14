@@ -31,6 +31,7 @@ extern "C" {
 #endif
 
 #include <utils/Errors.h>
+#include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -485,6 +486,17 @@ sp<MetaData> setFLACFormat(AVCodecContext *avctx)
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
     meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+
+    ABitReader br(avctx->extradata, avctx->extradata_size);
+    int32_t minBlockSize = br.getBits(16);
+    int32_t maxBlockSize = br.getBits(16);
+    int32_t minFrameSize = br.getBits(24);
+    int32_t maxFrameSize = br.getBits(24);
+
+    meta->setInt32('mibs', minBlockSize);
+    meta->setInt32('mabs', maxBlockSize);
+    meta->setInt32('mifs', minFrameSize);
+    meta->setInt32('mafs', maxFrameSize);
 
     return meta;
 }
