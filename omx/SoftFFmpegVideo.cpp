@@ -34,16 +34,23 @@ static int decoder_reorder_pts = -1;
 
 namespace android {
 
+static const CodecProfileLevel kM4VProfileLevels[] = {
+    { OMX_VIDEO_MPEG4ProfileSimple, OMX_VIDEO_MPEG4Level5 },
+    { OMX_VIDEO_MPEG4ProfileAdvancedSimple, OMX_VIDEO_MPEG4Level5 },
+};
+
 SoftFFmpegVideo::SoftFFmpegVideo(
         const char *name,
         const char *componentRole,
         OMX_VIDEO_CODINGTYPE codingType,
+        const CodecProfileLevel *profileLevels,
+        size_t numProfileLevels,
         const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData,
         OMX_COMPONENTTYPE **component,
         enum AVCodecID codecID)
     : SoftVideoDecoderOMXComponent(name, componentRole, codingType,
-            NULL, 0, 320, 240, callbacks, appData, component),
+            profileLevels, numProfileLevels, 352, 288, callbacks, appData, component),
       mCodingType(codingType),
       mFFmpegAlreadyInited(false),
       mCodecAlreadyOpened(false),
@@ -752,8 +759,15 @@ SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
         TRESPASS();
     }
 
+    if (!strcmp(name, "OMX.ffmpeg.mpeg4.decoder")) {
+        return new SoftFFmpegVideo(name, componentRole, codingType,
+                kM4VProfileLevels, ARRAY_SIZE(kM4VProfileLevels),
+                callbacks, appData, component, codecID);
+    }
+
     return new SoftFFmpegVideo(name, componentRole, codingType,
-                                        callbacks, appData, component, codecID);
+                NULL, 0,
+                callbacks, appData, component, codecID);
 }
 
 }  // namespace android

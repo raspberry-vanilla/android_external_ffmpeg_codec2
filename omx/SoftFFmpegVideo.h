@@ -29,6 +29,8 @@ struct SoftFFmpegVideo : public SoftVideoDecoderOMXComponent {
     SoftFFmpegVideo(const char *name,
             const char *componentRole,
             OMX_VIDEO_CODINGTYPE codingType,
+            const CodecProfileLevel *profileLevels,
+            size_t numProfileLevels,
             const OMX_CALLBACKTYPE *callbacks,
             OMX_PTR appData,
             OMX_COMPONENTTYPE **component,
