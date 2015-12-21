@@ -1147,15 +1147,15 @@ void FFmpegExtractor::readerEntry() {
             ret = avformat_seek_file(mFormatCtx, -1, mSeekMin, mSeekPos, mSeekMax, 0);
             if (ret < 0) {
                 ALOGE("%s: error while seeking", mFormatCtx->filename);
-            } else {
-                if (mAudioStreamIdx >= 0) {
-                    packet_queue_flush(&mAudioQ);
-                    packet_queue_put(&mAudioQ, &mAudioQ.flush_pkt);
-                }
-                if (mVideoStreamIdx >= 0) {
-                    packet_queue_flush(&mVideoQ);
-                    packet_queue_put(&mVideoQ, &mVideoQ.flush_pkt);
-                }
+                avformat_seek_file(mFormatCtx, -1, 0, 0, 0, 0);
+            }
+            if (mAudioStreamIdx >= 0) {
+                packet_queue_flush(&mAudioQ);
+                packet_queue_put(&mAudioQ, &mAudioQ.flush_pkt);
+            }
+            if (mVideoStreamIdx >= 0) {
+                packet_queue_flush(&mVideoQ);
+                packet_queue_put(&mVideoQ, &mVideoQ.flush_pkt);
             }
             mSeekIdx = -1;
             eof = false;
