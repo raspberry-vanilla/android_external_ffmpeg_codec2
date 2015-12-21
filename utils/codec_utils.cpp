@@ -82,22 +82,6 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
     return esds;
 }
 
-//Returns the sample rate based on the sampling frequency index
-static uint32_t getAACSampleRate(const uint8_t sf_index)
-{
-    static const uint32_t sample_rates[] =
-    {
-        96000, 88200, 64000, 48000, 44100, 32000,
-        24000, 22050, 16000, 12000, 11025, 8000
-    };
-
-    if (sf_index < sizeof(sample_rates) / sizeof(sample_rates[0])) {
-        return sample_rates[sf_index];
-    }
-
-    return 0;
-}
-
 //video
 
 //H.264 Video Types
@@ -286,7 +270,7 @@ sp<MetaData> setHEVCFormat(AVCodecContext *avctx)
 
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
-    meta->setData(kKeyHVCC, 0, avctx->extradata, avctx->extradata_size);
+    meta->setData(kKeyHVCC, kTypeHVCC, avctx->extradata, avctx->extradata_size);
 
     return meta;
 }
@@ -370,31 +354,10 @@ sp<MetaData> setAACFormat(AVCodecContext *avctx)
 {
     ALOGV("AAC");
 
-    uint32_t sr;
-    const uint8_t *header;
-    uint8_t profile, sf_index, channel;
-
-    header = avctx->extradata;
-    CHECK(header != NULL);
-
-    // AudioSpecificInfo follows
-    // oooo offf fccc c000
-    // o - audioObjectType
-    // f - samplingFreqIndex
-    // c - channelConfig
-    profile = ((header[0] & 0xf8) >> 3) - 1;
-    sf_index = (header[0] & 0x07) << 1 | (header[1] & 0x80) >> 7;
-    sr = getAACSampleRate(sf_index);
-    if (sr == 0) {
-        ALOGE("unsupport the aac sample rate");
-        return NULL;
-    }
-    channel = (header[1] >> 3) & 0xf;
-    ALOGV("aac profile: %d, sf_index: %d, channel: %d", profile, sf_index, channel);
-
-    sp<MetaData> meta = MakeAACCodecSpecificData(profile, sf_index, channel);
+    sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
-    meta->setInt32(kKeyAACAOT, profile);
+    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta->setInt32(kKeyAACAOT, avctx->profile + 1);
     return meta;
 }
 
