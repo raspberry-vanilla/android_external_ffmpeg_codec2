@@ -900,6 +900,7 @@ int FFmpegExtractor::initStreams()
     st_index[AVMEDIA_TYPE_VIDEO]  = -1;
     wanted_stream[AVMEDIA_TYPE_AUDIO]  = -1;
     wanted_stream[AVMEDIA_TYPE_VIDEO]  = -1;
+    AVDictionary *format_opts = NULL, *codec_opts = NULL;
     const char *mime = NULL;
 
     setFFmpegDefaultOpts();
@@ -932,8 +933,11 @@ int FFmpegExtractor::initStreams()
         ALOGE("Option %s not found.\n", t->key);
         //ret = AVERROR_OPTION_NOT_FOUND;
         ret = -1;
+        av_dict_free(&format_opts);
         goto fail;
     }
+
+    av_dict_free(&format_opts);
 
     if (mGenPTS)
         mFormatCtx->flags |= AVFMT_FLAG_GENPTS;
@@ -1884,6 +1888,7 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
     size_t nb_streams = 0;
     const char *container = NULL;
     AVFormatContext *ic = NULL;
+    AVDictionary *codec_opts = NULL;
     AVDictionary **opts = NULL;
 
     status_t status = initFFmpeg();

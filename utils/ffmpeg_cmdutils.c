@@ -4,8 +4,6 @@
 #include "libavutil/opt.h"
 #include "libavformat/avformat.h"
 
-AVDictionary *format_opts, *codec_opts;
-
 /*
 void print_error(const char *filename, int err)
 {
