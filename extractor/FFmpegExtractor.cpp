@@ -1352,6 +1352,7 @@ FFmpegSource::FFmpegSource(
 
             mNal2AnnexB = true;
         }
+
     }
 
     mMediaType = mStream->codec->codec_type;
@@ -1806,10 +1807,6 @@ static void adjustConfidenceIfNeeded(const char *mime,
         //todo here
     }
 
-    if (*confidence > 0.08) {
-        return;
-    }
-
     //2. check codec
     adjustCodecConfidence(ic, confidence);
 }
@@ -2024,15 +2021,21 @@ static const char *LegacySniffFFMPEG(const sp<DataSource> &source,
 bool SniffFFMPEG(
         const sp<DataSource> &source, String8 *mimeType, float *confidence,
         sp<AMessage> *meta) {
-    ALOGV("SniffFFMPEG");
+
+    float newConfidence = 0.08f;
+
+    ALOGV("SniffFFMPEG (initial confidence: %f)", confidence);
+
+    if (*confidence > 0.8f) {
+        return false;
+    }
 
     *meta = new AMessage;
-    *confidence = 0.08f;  // be the last resort, by default
 
-    const char *container = BetterSniffFFMPEG(source, confidence, *meta);
+    const char *container = BetterSniffFFMPEG(source, &newConfidence, *meta);
     if (!container) {
         ALOGW("sniff through BetterSniffFFMPEG failed, try LegacySniffFFMPEG");
-        container = LegacySniffFFMPEG(source, confidence, *meta);
+        container = LegacySniffFFMPEG(source, &newConfidence, *meta);
         if (container) {
             ALOGV("sniff through LegacySniffFFMPEG success");
         }
@@ -2048,7 +2051,7 @@ bool SniffFFMPEG(
     }
 
     ALOGD("ffmpeg detected media content as '%s' with confidence %.2f",
-            container, *confidence);
+            container, newConfidence);
 
     /* use MPEG4Extractor(not extended extractor) for HTTP source only */
     if (!strcasecmp(container, MEDIA_MIMETYPE_CONTAINER_MPEG4)
@@ -2071,11 +2074,12 @@ bool SniffFFMPEG(
     property_get("sys.media.parser.ffmpeg", value, "0");
     if (atoi(value)) {
         ALOGD("[debug] use ffmpeg parser");
-        *confidence = 0.88f;
+        newConfidence = 0.88f;
     }
 
-    if (*confidence > 0.08f) {
+    if (newConfidence > *confidence) {
         (*meta)->setString("extended-extractor-use", "ffmpegextractor");
+        *confidence = newConfidence;
     }
 
     return true;
