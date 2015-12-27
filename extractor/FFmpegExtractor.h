@@ -133,6 +133,8 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
 };
 
+static const char *findMatchingContainer(const char *name);
+
 bool SniffFFMPEG(
         const sp<DataSource> &source, String8 *mimeType, float *confidence,
         sp<AMessage> *);

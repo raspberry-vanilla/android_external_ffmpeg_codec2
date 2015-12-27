@@ -454,6 +454,7 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
         if (avctx->bit_rate > 0) {
             meta->setInt32(kKeyBitRate, avctx->bit_rate);
         }
+        meta->setCString('ffmt', findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
     }
 
@@ -540,6 +541,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);
         meta->setInt32('pfmt', to_android_audio_format(avctx->sample_fmt));
+        meta->setCString('ffmt', findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
     }
 
@@ -1365,7 +1367,7 @@ FFmpegSource::~FFmpegSource() {
     mExtractor = NULL;
 }
 
-status_t FFmpegSource::start(MetaData *params __unused) {
+status_t FFmpegSource::start(MetaData * /* params */) {
     ALOGV("FFmpegSource::start %s",
             av_get_media_type_string(mMediaType));
     return OK;
@@ -1883,13 +1885,6 @@ static const char *findMatchingContainer(const char *name)
     const char *container = NULL;
 #endif
 
-    ALOGV("list the formats suppoted by ffmpeg: ");
-    ALOGV("========================================");
-    for (i = 0; i < NELEM(FILE_FORMATS); ++i) {
-        ALOGV("format_names[%02d]: %s", i, FILE_FORMATS[i].format);
-    }
-    ALOGV("========================================");
-
     for (i = 0; i < NELEM(FILE_FORMATS); ++i) {
         int len = strlen(FILE_FORMATS[i].format);
         if (!strncasecmp(name, FILE_FORMATS[i].format, len)) {
@@ -2024,7 +2019,7 @@ bool SniffFFMPEG(
 
     float newConfidence = 0.08f;
 
-    ALOGV("SniffFFMPEG (initial confidence: %f)", confidence);
+    ALOGV("SniffFFMPEG (initial confidence: %f)", *confidence);
 
     if (*confidence > 0.8f) {
         return false;
