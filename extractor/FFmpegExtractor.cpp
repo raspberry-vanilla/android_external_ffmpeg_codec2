@@ -1800,6 +1800,8 @@ static void adjustConfidenceIfNeeded(const char *mime,
         adjustMPEG2TSConfidence(ic, confidence);
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_MATROSKA)) {
         adjustMKVConfidence(ic, confidence);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_CONTAINER_DIVX)) {
+        *confidence = 0.4f;
     } else {
         //todo here
     }
