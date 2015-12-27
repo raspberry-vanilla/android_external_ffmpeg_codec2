@@ -182,10 +182,10 @@ sp<MetaData> FFmpegExtractor::getTrackMetaData(size_t index, uint32_t flags __un
     }
 
     /* Quick and dirty, just get a frame 1/4 in */
-    if (mTracks.itemAt(index).mIndex == mVideoStreamIdx) {
-        int64_t thumb_ts = av_rescale_q((mFormatCtx->streams[mVideoStreamIdx]->duration / 4),
-                mFormatCtx->streams[mVideoStreamIdx]->time_base, AV_TIME_BASE_Q);
-        mTracks.itemAt(index).mMeta->setInt64(kKeyThumbnailTime, thumb_ts);
+    if (mTracks.itemAt(index).mIndex == mVideoStreamIdx &&
+            mFormatCtx->duration != AV_NOPTS_VALUE) {
+        mTracks.itemAt(index).mMeta->setInt64(
+                kKeyThumbnailTime, mFormatCtx->duration / 4);
     }
 
     return mTracks.itemAt(index).mMeta;
@@ -798,7 +798,7 @@ int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type,
 
     switch (mode) {
         case MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC:
-            mSeekMin = INT64_MIN;
+            mSeekMin = 0;
             mSeekMax = mSeekPos;
             break;
         case MediaSource::ReadOptions::SEEK_NEXT_SYNC:
@@ -806,11 +806,11 @@ int FFmpegExtractor::stream_seek(int64_t pos, enum AVMediaType media_type,
             mSeekMax = INT64_MAX;
             break;
         case MediaSource::ReadOptions::SEEK_CLOSEST_SYNC:
-            mSeekMin = INT64_MIN;
+            mSeekMin = 0;
             mSeekMax = INT64_MAX;
             break;
         case MediaSource::ReadOptions::SEEK_CLOSEST:
-            mSeekMin = INT64_MIN;
+            mSeekMin = 0;
             mSeekMax = mSeekPos;
             break;
         default:
