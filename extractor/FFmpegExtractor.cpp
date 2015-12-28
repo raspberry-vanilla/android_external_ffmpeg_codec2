@@ -1928,15 +1928,17 @@ static const char *findMatchingContainer(const char *name)
     return container;
 }
 
-static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fastMPEG4)
+static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool isStreaming)
 {
     int err = 0;
     size_t i = 0;
     size_t nb_streams = 0;
+    int64_t timeNow = 0;
     const char *container = NULL;
     AVFormatContext *ic = NULL;
     AVDictionary *codec_opts = NULL;
     AVDictionary **opts = NULL;
+    bool needProbe = false;
 
     status_t status = initFFmpeg();
     if (status != OK) {
@@ -1951,6 +1953,11 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
         goto fail;
     }
 
+    // Don't download more than a meg
+    ic->probesize = 1024 * 1024;
+
+    timeNow = ALooper::GetNowUs();
+
     err = avformat_open_input(&ic, url, NULL, NULL);
 
     if (err < 0) {
@@ -1958,31 +1965,47 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool fa
         goto fail;
     }
 
-    if (ic->iformat != NULL && ic->iformat->name != NULL &&
-        findMatchingContainer(ic->iformat->name) != NULL &&
-        !strcasecmp(findMatchingContainer(ic->iformat->name),
-        MEDIA_MIMETYPE_CONTAINER_MPEG4)) {
-        if (fastMPEG4) {
-            container = findMatchingContainer(ic->iformat->name);
+    if (ic->iformat != NULL && ic->iformat->name != NULL) {
+        container = findMatchingContainer(ic->iformat->name);
+    }
+
+    ALOGV("opened, nb_streams: %d container: %s delay: %.2f ms", ic->nb_streams, container,
+            ((float)ALooper::GetNowUs() - timeNow) / 1000);
+
+    // Only probe if absolutely necessary. For formats with headers, avformat_open_input will
+    // figure out the components.
+    for (unsigned int i = 0; i < ic->nb_streams; i++) {
+        AVStream* stream = ic->streams[i];
+        if (!stream->codec || !stream->codec->codec_id) {
+            needProbe = true;
+            break;
+        }
+        ALOGV("found stream %d id %d codec %s", i, stream->codec->codec_id, avcodec_get_name(stream->codec->codec_id));
+    }
+
+    // We must go deeper.
+    if (!isStreaming && (!ic->nb_streams || needProbe)) {
+        timeNow = ALooper::GetNowUs();
+
+        opts = setup_find_stream_info_opts(ic, codec_opts);
+        nb_streams = ic->nb_streams;
+        err = avformat_find_stream_info(ic, opts);
+        if (err < 0) {
+            ALOGE("%s: could not find stream info, err:%s", url, av_err2str(err));
             goto fail;
         }
+
+        ALOGV("probed stream info after %.2f ms", ((float)ALooper::GetNowUs() - timeNow) / 1000);
+
+        for (i = 0; i < nb_streams; i++) {
+            av_dict_free(&opts[i]);
+        }
+        av_freep(&opts);
+
+        av_dump_format(ic, 0, url, 0);
     }
 
-    opts = setup_find_stream_info_opts(ic, codec_opts);
-    nb_streams = ic->nb_streams;
-    err = avformat_find_stream_info(ic, opts);
-    if (err < 0) {
-        ALOGE("%s: could not find stream info, err:%s", url, av_err2str(err));
-        goto fail;
-    }
-    for (i = 0; i < nb_streams; i++) {
-        av_dict_free(&opts[i]);
-    }
-    av_freep(&opts);
-
-    av_dump_format(ic, 0, url, 0);
-
-    ALOGD("FFmpegExtrator, url: %s, format_name: %s, format_long_name: %s",
+    ALOGV("url: %s, format_name: %s, format_long_name: %s",
             url, ic->iformat->name, ic->iformat->long_name);
 
     container = findMatchingContainer(ic->iformat->name);
@@ -2013,7 +2036,8 @@ static const char *BetterSniffFFMPEG(const sp<DataSource> &source,
     // pass the addr of smart pointer("source")
     snprintf(url, sizeof(url), "android-source:%p", source.get());
 
-    ret = SniffFFMPEGCommon(url, confidence, (source->flags() & DataSource::kIsCachingDataSource));
+    ret = SniffFFMPEGCommon(url, confidence,
+            (source->flags() & DataSource::kIsCachingDataSource));
     if (ret) {
         meta->setString("extended-extractor-url", url);
     }
@@ -2051,10 +2075,15 @@ bool SniffFFMPEG(
 
     float newConfidence = 0.08f;
 
-    ALOGV("SniffFFMPEG (initial confidence: %f)", *confidence);
+    ALOGV("SniffFFMPEG (initial confidence: %f, mime: %s)", *confidence,
+            mimeType == NULL ? "unknown" : *mimeType);
 
-    if (*confidence > 0.8f) {
-        return false;
+    // This is a heavyweight sniffer, don't invoke it if Stagefright knows
+    // what it is doing already.
+    if (mimeType != NULL && confidence != NULL) {
+        if (*confidence > 0.8f) {
+            return false;
+        }
     }
 
     *meta = new AMessage;
