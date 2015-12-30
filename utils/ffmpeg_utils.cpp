@@ -386,13 +386,9 @@ void packet_queue_flush(PacketQueue *q)
 
 void packet_queue_abort(PacketQueue *q)
 {
-    pthread_mutex_lock(&q->mutex);
-
     q->abort_request = 1;
 
     pthread_cond_signal(&q->cond);
-
-    pthread_mutex_unlock(&q->mutex);
 }
 
 static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
