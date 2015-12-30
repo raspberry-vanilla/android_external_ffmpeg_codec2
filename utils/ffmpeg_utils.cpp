@@ -353,9 +353,6 @@ int is_extradata_compatible_with_android(AVCodecContext *avctx)
 void packet_queue_init(PacketQueue *q)
 {
     memset(q, 0, sizeof(PacketQueue));
-    pthread_mutex_init(&q->mutex, NULL);
-    pthread_cond_init(&q->cond, NULL);
-
     q->abort_request = 1;
 }
 
@@ -363,15 +360,13 @@ void packet_queue_destroy(PacketQueue *q)
 {
     packet_queue_abort(q);
     packet_queue_flush(q);
-    pthread_mutex_destroy(&q->mutex);
-    pthread_cond_destroy(&q->cond);
 }
 
 void packet_queue_flush(PacketQueue *q)
 {
     AVPacketList *pkt, *pkt1;
 
-    pthread_mutex_lock(&q->mutex);
+    Mutex::Autolock autoLock(q->lock);
     for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
         pkt1 = pkt->next;
         av_free_packet(&pkt->pkt);
@@ -381,14 +376,13 @@ void packet_queue_flush(PacketQueue *q)
     q->first_pkt = NULL;
     q->nb_packets = 0;
     q->size = 0;
-    pthread_mutex_unlock(&q->mutex);
 }
 
 void packet_queue_abort(PacketQueue *q)
 {
     q->abort_request = 1;
-
-    pthread_cond_signal(&q->cond);
+    Mutex::Autolock autoLock(q->lock);
+    q->cond.signal();
 }
 
 static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
@@ -412,7 +406,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     q->nb_packets++;
     //q->size += pkt1->pkt.size + sizeof(*pkt1);
     q->size += pkt1->pkt.size;
-    pthread_cond_signal(&q->cond);
+    q->cond.signal();
     return 0;
 }
 
@@ -424,9 +418,9 @@ int packet_queue_put(PacketQueue *q, AVPacket *pkt)
     if (pkt != &q->flush_pkt && av_dup_packet(pkt) < 0)
         return -1;
 
-    pthread_mutex_lock(&q->mutex);
+    q->lock.lock();
     ret = packet_queue_put_private(q, pkt);
-    pthread_mutex_unlock(&q->mutex);
+    q->lock.unlock();
 
     if (pkt != &q->flush_pkt && ret < 0)
         av_free_packet(pkt);
@@ -449,16 +443,11 @@ int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
 int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
 {
     AVPacketList *pkt1;
-    int ret;
+    int ret = -1;
 
-    pthread_mutex_lock(&q->mutex);
+    Mutex::Autolock autoLock(q->lock);
 
-    for (;;) {
-        if (q->abort_request) {
-            ret = -1;
-            break;
-        }
-
+    while (!q->abort_request) {
         pkt1 = q->first_pkt;
         if (pkt1) {
             q->first_pkt = pkt1->next;
@@ -475,22 +464,20 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
             ret = 0;
             break;
         } else {
-            pthread_cond_wait(&q->cond, &q->mutex);
+            q->cond.waitRelative(q->lock, 10000000LL);
         }
     }
-    pthread_mutex_unlock(&q->mutex);
     return ret;
 }
 
 void packet_queue_start(PacketQueue *q)
 {
-    pthread_mutex_lock(&q->mutex);
+    Mutex::Autolock autoLock(q->lock);
     av_init_packet(&q->flush_pkt);
     q->flush_pkt.data = (uint8_t *)&q->flush_pkt;
     q->flush_pkt.size = 0;
     q->abort_request = 0;
     packet_queue_put_private(q, &q->flush_pkt);
-    pthread_mutex_unlock(&q->mutex);
 }
 
 //////////////////////////////////////////////////////////////////////////////////

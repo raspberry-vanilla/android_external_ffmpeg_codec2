@@ -22,7 +22,9 @@
 #include <unistd.h>
 #include <stdlib.h>
 
+#include <utils/Condition.h>
 #include <utils/Errors.h>
+#include <utils/Mutex.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -89,8 +91,8 @@ typedef struct PacketQueue {
     int nb_packets;
     int size;
     int abort_request;
-    pthread_mutex_t mutex;
-    pthread_cond_t cond;
+    Mutex lock;
+    Condition cond;
 } PacketQueue;
 
 void packet_queue_init(PacketQueue *q);
