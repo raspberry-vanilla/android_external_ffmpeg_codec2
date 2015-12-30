@@ -1074,7 +1074,7 @@ int32_t SoftFFmpegAudio::decodeAudio() {
 
     CHECK_EQ(mResampledDataSize, 0);
 
-    if (!is_flush) {
+    if (!is_flush && !inQueue.empty()) {
         inInfo = *inQueue.begin();
         if (inInfo != NULL)  {
             inHeader = inInfo->mHeader;
