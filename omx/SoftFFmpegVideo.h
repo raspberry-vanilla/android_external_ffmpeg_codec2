@@ -58,7 +58,7 @@ private:
     enum {
         kInputPortIndex   = 0,
         kOutputPortIndex  = 1,
-        kNumInputBuffers  = 5,
+        kNumInputBuffers  = 8,
         kNumOutputBuffers = 2,
     };
 

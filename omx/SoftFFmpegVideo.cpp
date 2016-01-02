@@ -67,7 +67,7 @@ SoftFFmpegVideo::SoftFFmpegVideo(
 
     initPorts(
             kNumInputBuffers,
-            8192 /* inputBufferSize */,
+            1024 * 1024 /* inputBufferSize */,
             kNumOutputBuffers,
             name);
 
