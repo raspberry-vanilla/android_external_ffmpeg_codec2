@@ -366,6 +366,10 @@ void packet_queue_flush(PacketQueue *q)
 {
     AVPacketList *pkt, *pkt1;
 
+    if (q->abort_request) {
+        return;
+    }
+
     Mutex::Autolock autoLock(q->lock);
     for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
         pkt1 = pkt->next;
