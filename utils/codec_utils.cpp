@@ -519,5 +519,72 @@ int getDivXVersion(AVCodecContext *avctx)
     return -1;
 }
 
+status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
+    if (meta == NULL || ctx == NULL) {
+        return NO_INIT;
+    }
+
+    AVDictionary *dict = ctx->metadata;
+    if (dict == NULL) {
+        return NO_INIT;
+    }
+
+    struct MetadataMapping {
+        const char *from;
+        int to;
+    };
+
+    // avformat -> android mapping
+    static const MetadataMapping kMap[] = {
+        { "track", kKeyCDTrackNumber },
+        { "disc", kKeyDiscNumber },
+        { "album", kKeyAlbum },
+        { "artist", kKeyArtist },
+        { "album_artist", kKeyAlbumArtist },
+        { "composer", kKeyComposer },
+        { "date", kKeyDate },
+        { "genre", kKeyGenre },
+        { "title", kKeyTitle },
+        { "year", kKeyYear },
+        { "compilation", kKeyCompilation },
+        { "location", kKeyLocation },
+    };
+
+    static const size_t kNumEntries = sizeof(kMap) / sizeof(kMap[0]);
+
+    for (size_t i = 0; i < kNumEntries; ++i) {
+        AVDictionaryEntry *entry = av_dict_get(dict, kMap[i].from, NULL, 0);
+        if (entry != NULL) {
+            ALOGV("found key %s with value %s", entry->key, entry->value);
+            meta->setCString(kMap[i].to, entry->value);
+        }
+    }
+
+    // now look for album art- this will be in a separate stream
+    for (size_t i = 0; i < ctx->nb_streams; i++) {
+        if (ctx->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+            AVPacket pkt = ctx->streams[i]->attached_pic;
+            if (pkt.size > 0) {
+                if (ctx->streams[i]->codec != NULL) {
+                    const char *mime;
+                    if (ctx->streams[i]->codec->codec_id == AV_CODEC_ID_MJPEG) {
+                        mime = MEDIA_MIMETYPE_IMAGE_JPEG;
+                    } else if (ctx->streams[i]->codec->codec_id == AV_CODEC_ID_PNG) {
+                        mime = "image/png";
+                    } else {
+                        mime = NULL;
+                    }
+                    if (mime != NULL) {
+                        ALOGV("found albumart in stream %d with type %s len %d", i, mime, pkt.size);
+                        meta->setData(kKeyAlbumArt, MetaData::TYPE_NONE, pkt.data, pkt.size);
+                        meta->setCString(kKeyAlbumArtMIME, mime);
+                    }
+                }
+            }
+        }
+    }
+    return OK;
+}
+
 }  // namespace android
 

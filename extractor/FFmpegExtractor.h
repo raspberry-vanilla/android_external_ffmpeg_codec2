@@ -130,6 +130,8 @@ private:
     static void *ReaderWrapper(void *me);
     void readerEntry();
 
+    bool mParsedMetadata;
+
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
 };
 

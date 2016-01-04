@@ -66,6 +66,8 @@ status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
 
 int getDivXVersion(AVCodecContext *avctx);
 
+status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta);
+
 }  // namespace android
 
 #endif  // CODEC_UTILS_H_
