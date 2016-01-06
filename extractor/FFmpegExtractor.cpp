@@ -1341,7 +1341,13 @@ FFmpegSource::FFmpegSource(
 
             mNal2AnnexB = true;
         } else if (avctx->codec_id == AV_CODEC_ID_HEVC
-                && avctx->extradata_size > 0) {
+                && avctx->extradata_size > 3
+                && (avctx->extradata[0] || avctx->extradata[1] ||
+                    avctx->extradata[2] > 1)) {
+            /* It seems the extradata is encoded as hvcC format.
+             * Temporarily, we support configurationVersion==0 until 14496-15 3rd
+             * is finalized. When finalized, configurationVersion will be 1 and we
+             * can recognize hvcC by checking if avctx->extradata[0]==1 or not. */
             mIsHEVC = true;
 
             uint32_t type;
