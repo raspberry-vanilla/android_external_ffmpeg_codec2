@@ -595,11 +595,12 @@ int FFmpegExtractor::stream_component_open(int stream_index)
     if (!supported) {
         ALOGE("unsupport the codec(%s)", avcodec_get_name(avctx->codec_id));
         return -1;
-    } else if (mFormatCtx->streams[stream_index]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+    } else if ((mFormatCtx->streams[stream_index]->disposition & AV_DISPOSITION_ATTACHED_PIC) ||
+                avctx->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
         ALOGD("not opening attached picture(%s)", avcodec_get_name(avctx->codec_id));
         return -1;
     }
-    ALOGI("support the codec(%s)", avcodec_get_name(avctx->codec_id));
+    ALOGI("support the codec(%s) disposition(%x)", avcodec_get_name(avctx->codec_id), mFormatCtx->streams[stream_index]->disposition);
 
     unsigned streamType;
     for (size_t i = 0; i < mTracks.size(); ++i) {
@@ -1591,6 +1592,10 @@ static AVCodecContext* getCodecContext(AVFormatContext *ic, AVMediaType codec_ty
         }
 
         avctx = ic->streams[idx]->codec;
+        if (avctx->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
+            // Sometimes the disposition isn't set
+            continue;
+        }
         if (avctx->codec_type == codec_type) {
             return avctx;
         }
