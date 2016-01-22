@@ -1,5 +1,7 @@
 #if 1
 #include "config.h"
+#include "libavutil/display.h"
+#include "libavutil/eval.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
 #include "libavformat/avformat.h"
@@ -15,6 +17,30 @@ void print_error(const char *filename, int err)
     av_log(NULL, AV_LOG_ERROR, "%s: %s\n", filename, errbuf_ptr);
 }
 */
+
+double get_rotation(AVStream *st)
+{
+    AVDictionaryEntry *rotate_tag = av_dict_get(st->metadata, "rotate", NULL, 0);
+    uint8_t* displaymatrix = av_stream_get_side_data(st,
+                                                     AV_PKT_DATA_DISPLAYMATRIX, NULL);
+    double theta = 0;
+
+    if (rotate_tag && *rotate_tag->value && strcmp(rotate_tag->value, "0")) {
+        char *tail;
+        theta = av_strtod(rotate_tag->value, &tail);
+        if (*tail)
+            theta = 0;
+    }
+    if (displaymatrix && !theta)
+        theta = -av_display_rotation_get((int32_t*) displaymatrix);
+
+    theta -= 360*floor(theta/360 + 0.9/360);
+
+    if (fabs(theta - 90*round(theta/90)) > 2)
+        av_log(NULL, AV_LOG_WARNING, "Odd rotation angle.");
+
+    return theta;
+}
 
 int check_stream_specifier(AVFormatContext *s, AVStream *st, const char *spec)
 {

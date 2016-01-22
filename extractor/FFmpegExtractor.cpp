@@ -430,6 +430,23 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
     }
 
     if (meta != NULL) {
+        // rotation
+        double theta = get_rotation(stream);
+        int rotationDegrees = 0;
+
+        if (fabs(theta - 90) < 1.0) {
+            rotationDegrees = 90;
+        } else if (fabs(theta - 180) < 1.0) {
+            rotationDegrees = 180;
+        } else if (fabs(theta - 270) < 1.0) {
+            rotationDegrees = 270;
+        }
+        if (rotationDegrees != 0) {
+            meta->setInt32(kKeyRotation, rotationDegrees);
+        }
+    }
+
+    if (meta != NULL) {
         float aspect_ratio;
         int width, height;
 
