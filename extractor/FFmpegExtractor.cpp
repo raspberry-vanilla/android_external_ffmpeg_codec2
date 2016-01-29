@@ -1520,6 +1520,21 @@ retry:
     else
         timeUs = SF_NOPTS_VALUE; //FIXME AV_NOPTS_VALUE is negative, but stagefright need positive
 
+    // Negative timestamp will cause crash for media_server
+    // in OMXCodec.cpp CHECK(lastBufferTimeUs >= 0).
+    // And we should not get negative timestamp
+    if (timeUs < 0) {
+        ALOGE("negative timestamp encounter: time: %" PRId64
+               " startTimeUs: %" PRId64
+               " packet dts: %" PRId64
+               " packet pts: %" PRId64
+               , timeUs, startTimeUs, pkt.dts, pkt.pts);
+        mediaBuffer->release();
+        mediaBuffer = NULL;
+        av_free_packet(&pkt);
+        return ERROR_MALFORMED;
+    }
+
     // predict the next PTS to use for exact-frame seek below
     int64_t nextPTS = AV_NOPTS_VALUE;
     if (mLastPTS != AV_NOPTS_VALUE && timeUs > mLastPTS) {
