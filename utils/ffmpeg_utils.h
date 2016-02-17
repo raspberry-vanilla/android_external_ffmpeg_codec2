@@ -90,6 +90,7 @@ typedef struct PacketQueue {
     AVPacketList *first_pkt, *last_pkt;
     int nb_packets;
     int size;
+    int wait_for_data;
     int abort_request;
     Mutex lock;
     Condition cond;
@@ -100,6 +101,7 @@ void packet_queue_destroy(PacketQueue *q);
 void packet_queue_flush(PacketQueue *q);
 void packet_queue_start(PacketQueue *q);
 void packet_queue_abort(PacketQueue *q);
+int packet_queue_is_wait_for_data(PacketQueue *q);
 int packet_queue_put(PacketQueue *q, AVPacket *pkt);
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index);
 int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block);

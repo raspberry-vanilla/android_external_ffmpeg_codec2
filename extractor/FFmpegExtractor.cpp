@@ -1201,6 +1201,15 @@ void FFmpegExtractor::readerEntry() {
             ALOGV("readerEntry, full(wtf!!!), mVideoQ.size: %d, mVideoQ.nb_packets: %d, mAudioQ.size: %d, mAudioQ.nb_packets: %d",
                     mVideoQ.size, mVideoQ.nb_packets, mAudioQ.size, mAudioQ.nb_packets);
 #endif
+            // avoid deadlock, the audio and video data in the video is offset too large.
+            if ((mAudioQ.size == 0) && mAudioQ.wait_for_data) {
+                ALOGE("abort audio queue, since offset to video data too large");
+                packet_queue_abort(&mAudioQ);
+            }
+            if ((mVideoQ.size == 0) && mVideoQ.wait_for_data) {
+                ALOGE("abort video queue, since offset to audio data too large");
+                packet_queue_abort(&mVideoQ);
+            }
             /* wait 10 ms */
             mExtractorMutex.lock();
             mCondition.waitRelative(mExtractorMutex, milliseconds(10));

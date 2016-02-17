@@ -432,6 +432,12 @@ int packet_queue_put(PacketQueue *q, AVPacket *pkt)
     return ret;
 }
 
+int packet_queue_is_wait_for_data(PacketQueue *q)
+{
+    Mutex::Autolock autoLock(q->lock);
+    return q->wait_for_data;
+}
+
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
 {
     AVPacket pkt1, *pkt = &pkt1;
@@ -468,9 +474,11 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
             ret = 0;
             break;
         } else {
+            q->wait_for_data = 1;
             q->cond.waitRelative(q->lock, 10000000LL);
         }
     }
+    q->wait_for_data = 0;
     return ret;
 }
 
