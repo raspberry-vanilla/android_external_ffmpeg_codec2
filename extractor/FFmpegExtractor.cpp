@@ -47,8 +47,8 @@
 
 #include "FFmpegExtractor.h"
 
-#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
-#define MIN_AUDIOQ_SIZE (20 * 16 * 1024)
+#define MAX_QUEUE_SIZE (40 * 1024 * 1024)
+#define MIN_AUDIOQ_SIZE (2 * 1024 * 1024)
 #define MIN_FRAMES 5
 #define EXTRACTOR_MAX_PROBE_PACKETS 200
 #define FF_MAX_EXTRADATA_SIZE ((1 << 28) - FF_INPUT_BUFFER_PADDING_SIZE)
