@@ -1436,6 +1436,7 @@ status_t FFmpegSource::read(
     int64_t timeUs = AV_NOPTS_VALUE;
     int key = 0;
     status_t status = OK;
+    int max_negative_time_frame = 100;
 
     int64_t startTimeUs = mStream->start_time == AV_NOPTS_VALUE ? 0 :
         av_rescale_q(mStream->start_time, mStream->time_base, AV_TIME_BASE_Q);
@@ -1541,7 +1542,12 @@ retry:
         mediaBuffer->release();
         mediaBuffer = NULL;
         av_packet_unref(&pkt);
-        return ERROR_MALFORMED;
+        if (max_negative_time_frame-- > 0) {
+            goto retry;
+        } else {
+            ALOGE("too many negative timestamp packets, abort decoding");
+            return ERROR_MALFORMED;
+        }
     }
 
     // predict the next PTS to use for exact-frame seek below
