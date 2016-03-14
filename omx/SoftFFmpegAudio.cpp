@@ -249,7 +249,7 @@ void SoftFFmpegAudio::deInitDecoder() {
         mCtx = NULL;
     }
     if (mFrame) {
-        av_freep(&mFrame);
+        av_frame_free(&mFrame);
         mFrame = NULL;
     }
     if (mSwrCtx) {
