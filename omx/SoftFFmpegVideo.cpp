@@ -142,9 +142,9 @@ void SoftFFmpegVideo::deInitDecoder() {
         }
         if (mCodecAlreadyOpened) {
             avcodec_close(mCtx);
-            av_free(mCtx);
-            mCtx = NULL;
         }
+        av_free(mCtx);
+        mCtx = NULL;
     }
     if (mFrame) {
         av_freep(&mFrame);
