@@ -369,7 +369,7 @@ void packet_queue_flush(PacketQueue *q)
     Mutex::Autolock autoLock(q->lock);
     for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
         pkt1 = pkt->next;
-        av_free_packet(&pkt->pkt);
+        av_packet_unref(&pkt->pkt);
         av_freep(&pkt);
     }
     q->last_pkt = NULL;
@@ -423,7 +423,7 @@ int packet_queue_put(PacketQueue *q, AVPacket *pkt)
     q->lock.unlock();
 
     if (pkt != &q->flush_pkt && ret < 0)
-        av_free_packet(pkt);
+        av_packet_unref(pkt);
 
     return ret;
 }
