@@ -1525,7 +1525,7 @@ retry:
     }
 
     if (pktTS != AV_NOPTS_VALUE)
-        timeUs = av_rescale_q(pktTS, mStream->time_base, AV_TIME_BASE_Q) + startTimeUs;
+        timeUs = av_rescale_q(pktTS, mStream->time_base, AV_TIME_BASE_Q) - startTimeUs;
     else
         timeUs = SF_NOPTS_VALUE; //FIXME AV_NOPTS_VALUE is negative, but stagefright need positive
 
