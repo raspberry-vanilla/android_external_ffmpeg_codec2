@@ -142,6 +142,7 @@ void SoftFFmpegVideo::deInitDecoder() {
         }
         if (mCodecAlreadyOpened) {
             avcodec_close(mCtx);
+            mCodecAlreadyOpened = false;
         }
         av_free(mCtx);
         mCtx = NULL;
@@ -739,6 +740,9 @@ void SoftFFmpegVideo::onPortFlushCompleted(OMX_U32 portIndex) {
 
 void SoftFFmpegVideo::onReset() {
     ALOGV("onReset()");
+    enum AVCodecID codecID = mCtx->codec_id;
+    deInitDecoder();
+    initDecoder(codecID);
     SoftVideoDecoderOMXComponent::onReset();
     mSignalledError = false;
     mExtradataReady = false;
