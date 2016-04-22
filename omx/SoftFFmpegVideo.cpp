@@ -458,15 +458,20 @@ int32_t SoftFFmpegVideo::decodeVideo() {
     int len = 0, err = 0;
     int gotPic = false;
     int32_t ret = ERR_OK;
-    bool is_flush = (mEOSStatus != INPUT_DATA_AVAILABLE);
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     BufferInfo *inInfo = NULL;
     OMX_BUFFERHEADERTYPE *inHeader = NULL;
 
-    if (!is_flush) {
+    if (!inQueue.empty()) {
         inInfo = *inQueue.begin();
-        CHECK(inInfo != NULL);
-        inHeader = inInfo->mHeader;
+        if (inInfo != NULL)  {
+            inHeader = inInfo->mHeader;
+        }
+    }
+
+    if (mEOSStatus == INPUT_EOS_SEEN && (!inHeader || inHeader->nFilledLen == 0)
+        && !(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
+        return ERR_FLUSHED;
     }
 
     AVPacket pkt;
@@ -485,7 +490,8 @@ int32_t SoftFFmpegVideo::decodeVideo() {
         if (!gotPic) {
             ALOGI("ffmpeg video decoder failed to get frame.");
             //stop sending empty packets if the decoder is finished
-            if (is_flush && mCtx->codec->capabilities & CODEC_CAP_DELAY) {
+            if (mEOSStatus != INPUT_DATA_AVAILABLE && mCtx->codec->capabilities & CODEC_CAP_DELAY &&
+                !inHeader || inHeader->nFilledLen == 0) {
                 ret = ERR_FLUSHED;
             } else {
                 ret = ERR_NO_FRM;
@@ -495,10 +501,12 @@ int32_t SoftFFmpegVideo::decodeVideo() {
         }
     }
 
-    if (!is_flush) {
+    if (!inQueue.empty()) {
         inQueue.erase(inQueue.begin());
-        inInfo->mOwnedByUs = false;
-        notifyEmptyBufferDone(inHeader);
+        if (inInfo) {
+            inInfo->mOwnedByUs = false;
+            notifyEmptyBufferDone(inHeader);
+        }
     }
 
     return ret;
@@ -596,12 +604,6 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
        return;
    }
 
-    if(!(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
-        drainEOSOutputBuffer();
-        mEOSStatus = OUTPUT_FRAMES_FLUSHED;
-        return;
-    }
-
     while (!outQueue.empty()) {
         int32_t err = decodeVideo();
         if (err < ERR_OK) {
@@ -611,6 +613,8 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
         } else if (err == ERR_FLUSHED) {
             drainEOSOutputBuffer();
             return;
+        } else if (err == ERR_NO_FRM) {
+            continue;
         } else {
             CHECK_EQ(err, ERR_OK);
         }
@@ -672,6 +676,11 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
             continue;
         }
 
+        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
+            mEOSStatus = INPUT_EOS_SEEN;
+            continue;
+        }
+
         if (inHeader->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
             ALOGD("ffmpeg got codecconfig buffer");
             if (handleExtradata() != ERR_OK) {
@@ -679,10 +688,6 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
                 mSignalledError = true;
             }
             continue;
-        }
-
-        if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
-            mEOSStatus = INPUT_EOS_SEEN;
         }
 
         if (!mCodecAlreadyOpened) {
@@ -737,6 +742,7 @@ void SoftFFmpegVideo::onReset() {
     SoftVideoDecoderOMXComponent::onReset();
     mSignalledError = false;
     mExtradataReady = false;
+    mEOSStatus = INPUT_DATA_AVAILABLE;
 }
 
 SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
