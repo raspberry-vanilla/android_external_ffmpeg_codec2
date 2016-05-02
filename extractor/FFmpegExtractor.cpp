@@ -1509,7 +1509,13 @@ retry:
     //copy data
     if ((mIsAVC || mIsHEVC) && mNal2AnnexB) {
         /* This only works for NAL sizes 3-4 */
-        CHECK(mNALLengthSize == 3 || mNALLengthSize == 4);
+        if ((mNALLengthSize != 3) && (mNALLengthSize != 4)) {
+            ALOGE("cannot use convertNal2AnnexB, nal size: %d", mNALLengthSize);
+            mediaBuffer->release();
+            mediaBuffer = NULL;
+            av_packet_unref(&pkt);
+            return ERROR_MALFORMED;
+        }
 
         uint8_t *dst = (uint8_t *)mediaBuffer->data();
         /* Convert H.264 NAL format to annex b */
