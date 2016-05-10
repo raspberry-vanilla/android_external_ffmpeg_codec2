@@ -450,6 +450,11 @@ sp<MetaData> setFLACFormat(AVCodecContext *avctx)
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
     meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
+    if (avctx->extradata_size < 10) {
+        ALOGE("Invalid extradata in FLAC file! (size=%d)", avctx->extradata_size);
+        return meta;
+    }
+
     ABitReader br(avctx->extradata, avctx->extradata_size);
     int32_t minBlockSize = br.getBits(16);
     int32_t maxBlockSize = br.getBits(16);
@@ -575,7 +580,7 @@ status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
                         mime = NULL;
                     }
                     if (mime != NULL) {
-                        ALOGV("found albumart in stream %d with type %s len %d", i, mime, pkt.size);
+                        ALOGV("found albumart in stream %zu with type %s len %d", i, mime, pkt.size);
                         meta->setData(kKeyAlbumArt, MetaData::TYPE_NONE, pkt.data, pkt.size);
                         meta->setCString(kKeyAlbumArtMIME, mime);
                     }
