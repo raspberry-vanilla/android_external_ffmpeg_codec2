@@ -1124,7 +1124,7 @@ int32_t SoftFFmpegAudio::decodeAudio() {
         }
     }
 
-    if (!is_flush) {
+    if (!is_flush && !inHeader) {
         if (len < 0) {
             //if error, we skip the frame 
             inputBufferUsedLength = mInputBufferSize;
