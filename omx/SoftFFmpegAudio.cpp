@@ -1124,24 +1124,26 @@ int32_t SoftFFmpegAudio::decodeAudio() {
         }
     }
 
-    if (!is_flush && !inHeader) {
+    if (!is_flush) {
         if (len < 0) {
             //if error, we skip the frame 
             inputBufferUsedLength = mInputBufferSize;
         } else {
             inputBufferUsedLength = len;
         }
-
-        CHECK_GE(inHeader->nFilledLen, inputBufferUsedLength);
-        inHeader->nOffset += inputBufferUsedLength;
-        inHeader->nFilledLen -= inputBufferUsedLength;
         mInputBufferSize -= inputBufferUsedLength;
 
-        if (inHeader->nFilledLen == 0) {
-            CHECK_EQ(mInputBufferSize, 0);
-            inQueue.erase(inQueue.begin());
-            inInfo->mOwnedByUs = false;
-            notifyEmptyBufferDone(inHeader);
+        if (inHeader != NULL) {
+            CHECK_GE(inHeader->nFilledLen, inputBufferUsedLength);
+            inHeader->nOffset += inputBufferUsedLength;
+            inHeader->nFilledLen -= inputBufferUsedLength;
+
+            if (inHeader->nFilledLen == 0) {
+                CHECK_EQ(mInputBufferSize, 0);
+                inQueue.erase(inQueue.begin());
+                inInfo->mOwnedByUs = false;
+                notifyEmptyBufferDone(inHeader);
+            }
         }
     }
 
