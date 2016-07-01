@@ -491,8 +491,8 @@ int32_t SoftFFmpegVideo::decodeVideo() {
         if (!gotPic) {
             ALOGI("ffmpeg video decoder failed to get frame.");
             //stop sending empty packets if the decoder is finished
-            if (mEOSStatus != INPUT_DATA_AVAILABLE && mCtx->codec->capabilities & CODEC_CAP_DELAY &&
-                !inHeader || inHeader->nFilledLen == 0) {
+            if ((mEOSStatus != INPUT_DATA_AVAILABLE && (mCtx->codec->capabilities & CODEC_CAP_DELAY) &&
+                !inHeader) || inHeader->nFilledLen == 0) {
                 ret = ERR_FLUSHED;
             } else {
                 ret = ERR_NO_FRM;
