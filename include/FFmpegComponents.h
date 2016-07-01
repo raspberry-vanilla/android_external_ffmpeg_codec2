@@ -57,6 +57,8 @@ static const struct AudioCodingMapEntry {
         OMX_AUDIO_CodingVORBIS, "audio_decoder.vorbis", AV_CODEC_ID_VORBIS },
     { "OMX.ffmpeg.wma.decoder",
         OMX_AUDIO_CodingWMA, "audio_decoder.wma", AV_CODEC_ID_WMAV2 },
+    { "OMX.ffmpeg.alac.decoder",
+        (OMX_AUDIO_CODINGTYPE)OMX_AUDIO_CodingALAC, "audio_decoder.alac", AV_CODEC_ID_ALAC },
 };
 
 static const struct VideoCodingMapEntry {

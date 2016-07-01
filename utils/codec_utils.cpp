@@ -420,6 +420,17 @@ sp<MetaData> setRAFormat(AVCodecContext *avctx)
     return meta;
 }
 
+sp<MetaData> setALACFormat(AVCodecContext *avctx)
+{
+    ALOGV("ALAC");
+
+    sp<MetaData> meta = new MetaData;
+    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_ALAC);
+    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+
+    return meta;
+}
+
 sp<MetaData> setAPEFormat(AVCodecContext *avctx)
 {
     ALOGV("APE");

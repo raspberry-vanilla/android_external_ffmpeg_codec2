@@ -59,6 +59,7 @@ sp<MetaData> setRAFormat(AVCodecContext *avctx);
 sp<MetaData> setAPEFormat(AVCodecContext *avctx);
 sp<MetaData> setDTSFormat(AVCodecContext *avctx);
 sp<MetaData> setFLACFormat(AVCodecContext *avctx);
+sp<MetaData> setALACFormat(AVCodecContext *avctx);
 
 //Convert H.264 NAL format to annex b
 status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,

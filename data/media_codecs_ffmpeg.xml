@@ -28,6 +28,10 @@
             <Limit name="sample-rate" ranges="8000-192000" />
         </MediaCodec>
         -->
+        <MediaCodec name="OMX.ffmpeg.alac.decoder"   type="audio/alac" >
+            <Limit name="channel-count" max="8" />
+            <Limit name="sample-rate" ranges="8000-192000" />
+        </MediaCodec>
         <MediaCodec name="OMX.ffmpeg.ape.decoder"    type="audio/x-ape" >
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000-192000" />
@@ -48,6 +52,16 @@
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000-192000" />
         </MediaCodec>
+        <!--
+        <MediaCodec name="OMX.ffmpeg.mp3.decoder"    type="audio/mpeg">
+            <Limit name="channel-count" max="8" />
+            <Limit name="sample-rate" ranges="8000-192000" />
+        </MediaCodec>
+        <MediaCodec name="OMX.ffmpeg.vorbis.decoder"    type="audio/vorbis">
+            <Limit name="channel-count" max="8" />
+            <Limit name="sample-rate" ranges="8000-192000" />
+        </MediaCodec>
+        -->
         <MediaCodec name="OMX.ffmpeg.ra.decoder"     type="audio/vnd.rn-realaudio" >
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000-192000" />

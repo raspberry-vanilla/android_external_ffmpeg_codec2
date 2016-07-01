@@ -469,6 +469,23 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             return OMX_ErrorNone;
         }
 
+        case OMX_IndexParamAudioAlac:
+        {
+            OMX_AUDIO_PARAM_ALACTYPE *profile =
+                (OMX_AUDIO_PARAM_ALACTYPE *)params;
+
+            if (profile->nPortIndex != kInputPortIndex) {
+                return OMX_ErrorUndefined;
+            }
+
+            profile->nChannels = mCtx->channels;
+            profile->nSamplingRate = mCtx->sample_rate;
+
+            profile->nBitsPerSample = mCtx->bits_per_coded_sample;
+
+            return OMX_ErrorNone;
+        }
+
         case OMX_IndexParamAudioApe:
         {
             OMX_AUDIO_PARAM_APETYPE *profile =
@@ -808,6 +825,28 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
             return OMX_ErrorNone;
         }
 
+        case OMX_IndexParamAudioAlac:
+        {
+            OMX_AUDIO_PARAM_ALACTYPE *profile =
+                (OMX_AUDIO_PARAM_ALACTYPE *)params;
+
+            if (profile->nPortIndex != kInputPortIndex) {
+                return OMX_ErrorUndefined;
+            }
+
+            mCtx->channels = profile->nChannels;
+            mCtx->sample_rate = profile->nSamplingRate;
+            mCtx->bits_per_coded_sample = profile->nBitsPerSample;
+
+            adjustAudioParams();
+
+            ALOGV("set OMX_IndexParamAudioAlac, nChannels:%u, "
+                    "nSampleRate:%u, nBitsPerSample:%u",
+                profile->nChannels, profile->nSamplingRate,
+                profile->nBitsPerSample);
+
+            return OMX_ErrorNone;
+        }
 
         case OMX_IndexParamAudioApe:
         {

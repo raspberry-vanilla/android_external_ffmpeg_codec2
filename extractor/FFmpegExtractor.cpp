@@ -343,6 +343,7 @@ bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
     case AV_CODEC_ID_FLV1:
     case AV_CODEC_ID_VORBIS:
     case AV_CODEC_ID_HEVC:
+    case AV_CODEC_ID_ALAC:
 
         supported = true;
         break;
@@ -534,6 +535,9 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
         break;
     case AV_CODEC_ID_FLAC:
         meta = setFLACFormat(avctx);
+        break;
+    case AV_CODEC_ID_ALAC:
+        meta = setALACFormat(avctx);
         break;
     default:
         ALOGD("unsuppoted audio codec(id:%d, name:%s), but give it a chance",
@@ -1967,6 +1971,9 @@ static void adjustContainerIfNeeded(const char **mime, AVFormatContext *ic)
         case AV_CODEC_ID_WMALOSSLESS:
             newMime = MEDIA_MIMETYPE_AUDIO_WMA;
             break;
+        case AV_CODEC_ID_ALAC:
+            newMime = MEDIA_MIMETYPE_AUDIO_ALAC;
+            break;
         default:
             break;
         }
@@ -2222,6 +2229,7 @@ MediaExtractor *CreateFFmpegExtractor(const sp<DataSource> &source, const char *
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)          ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)           ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS)        ||
+            !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_ALAC)          ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)          ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC3)           ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_APE)           ||
