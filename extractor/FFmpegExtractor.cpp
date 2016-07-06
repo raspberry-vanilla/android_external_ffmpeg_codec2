@@ -122,6 +122,9 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
 
     fetchStuffsFromSniffedMeta(meta);
 
+    packet_queue_init(&mVideoQ);
+    packet_queue_init(&mAudioQ);
+
     int err = initStreams();
     if (err < 0) {
         ALOGE("failed to init ffmpeg");
@@ -134,11 +137,11 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
     while(mProbePkts <= EXTRACTOR_MAX_PROBE_PACKETS && !mEOF &&
         (mFormatCtx->pb ? !mFormatCtx->pb->error : 1) &&
         (mDefersToCreateVideoTrack || mDefersToCreateAudioTrack)) {
-        ALOGV("mProbePkts=%d", mProbePkts);
+        ALOGV("mProbePkts=%zu", mProbePkts);
         usleep(5000);
     }
 
-    ALOGV("mProbePkts: %d, mEOF: %d, pb->error(if has): %d, mDefersToCreateVideoTrack: %d, mDefersToCreateAudioTrack: %d",
+    ALOGV("mProbePkts: %zu, mEOF: %d, pb->error(if has): %d, mDefersToCreateVideoTrack: %d, mDefersToCreateAudioTrack: %d",
         mProbePkts, mEOF, mFormatCtx->pb ? mFormatCtx->pb->error : 0, mDefersToCreateVideoTrack, mDefersToCreateAudioTrack);
 
     mInitCheck = OK;
@@ -158,7 +161,7 @@ size_t FFmpegExtractor::countTracks() {
 }
 
 sp<MediaSource> FFmpegExtractor::getTrack(size_t index) {
-    ALOGV("FFmpegExtractor::getTrack[%d]", index);
+    ALOGV("FFmpegExtractor::getTrack[%zu]", index);
 
     if (mInitCheck != OK) {
         return NULL;
@@ -172,7 +175,7 @@ sp<MediaSource> FFmpegExtractor::getTrack(size_t index) {
 }
 
 sp<MetaData> FFmpegExtractor::getTrackMetaData(size_t index, uint32_t flags __unused) {
-    ALOGV("FFmpegExtractor::getTrackMetaData[%d]", index);
+    ALOGV("FFmpegExtractor::getTrackMetaData[%zu]", index);
 
     if (mInitCheck != OK) {
         return NULL;
@@ -463,7 +466,7 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
         height = avctx->height;
         width = ((int)rint(height * aspect_ratio)) & ~1;
 
-        ALOGI("width: %d, height: %d, bit_rate: %d aspect ratio: %f",
+        ALOGI("width: %d, height: %d, bit_rate: % " PRId64 " aspect ratio: %f",
                 avctx->width, avctx->height, avctx->bit_rate, aspect_ratio);
 
         meta->setInt32(kKeyWidth, avctx->width);
@@ -547,7 +550,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
     }
 
     if (meta != NULL) {
-        ALOGD("bit_rate: %d, sample_rate: %d, channels: %d, "
+        ALOGD("bit_rate: %" PRId64 ", sample_rate: %d, channels: %d, "
                 "bits_per_coded_sample: %d, block_align: %d "
                 "bits_per_raw_sample: %d, sample_format: %d",
                 avctx->bit_rate, avctx->sample_rate, avctx->channels,
@@ -580,7 +583,7 @@ void FFmpegExtractor::setDurationMetaData(AVStream *stream, sp<MetaData> &meta)
         printTime(duration);
         const char *s = av_get_media_type_string(avctx->codec_type);
         if (stream->start_time != AV_NOPTS_VALUE) {
-            ALOGV("%s startTime:%lld", s, stream->start_time);
+            ALOGV("%s startTime: %" PRId64, s, stream->start_time);
         } else {
             ALOGV("%s startTime:N/A", s);
         }
@@ -1009,7 +1012,7 @@ int FFmpegExtractor::initStreams()
             mFormatCtx->start_time != AV_NOPTS_VALUE) {
         int hours, mins, secs, us;
 
-        ALOGV("file startTime: %lld", mFormatCtx->start_time);
+        ALOGV("file startTime: %" PRId64, mFormatCtx->start_time);
 
         mDuration = mFormatCtx->duration;
 
@@ -1022,9 +1025,6 @@ int FFmpegExtractor::initStreams()
         ALOGI("the duration is %02d:%02d:%02d.%02d",
             hours, mins, secs, (100 * us) / AV_TIME_BASE);
     }
-
-    packet_queue_init(&mVideoQ);
-    packet_queue_init(&mAudioQ);
 
     if (st_index[AVMEDIA_TYPE_AUDIO] >= 0) {
         audio_ret = stream_component_open(st_index[AVMEDIA_TYPE_AUDIO]);
@@ -1174,7 +1174,7 @@ void FFmpegExtractor::readerEntry() {
 
         if (mSeekIdx >= 0) {
             Mutex::Autolock _l(mLock);
-            ALOGV("readerEntry, mSeekIdx: %d mSeekPos: %lld (%lld/%lld)", mSeekIdx, mSeekPos, mSeekMin, mSeekMax);
+            ALOGV("readerEntry, mSeekIdx: %d mSeekPos: %" PRId64 " (%" PRId64 "/%" PRId64 ")", mSeekIdx, mSeekPos, mSeekMin, mSeekMax);
             ret = avformat_seek_file(mFormatCtx, -1, mSeekMin, mSeekPos, mSeekMax, 0);
             if (ret < 0) {
                 ALOGE("%s: error while seeking", mFormatCtx->filename);
@@ -1275,9 +1275,9 @@ void FFmpegExtractor::readerEntry() {
 
                 stream_component_open(mVideoStreamIdx);
                 if (!mDefersToCreateVideoTrack)
-                    ALOGI("probe packet counter: %d when create video track ok", mProbePkts);
+                    ALOGI("probe packet counter: %zu when create video track ok", mProbePkts);
                 if (mProbePkts == EXTRACTOR_MAX_PROBE_PACKETS)
-                    ALOGI("probe packet counter to max: %d, create video track: %d",
+                    ALOGI("probe packet counter to max: %zu, create video track: %d",
                         mProbePkts, !mDefersToCreateVideoTrack);
             }
         } else if (pkt->stream_index == mAudioStreamIdx) {
@@ -1305,9 +1305,9 @@ void FFmpegExtractor::readerEntry() {
                 }
                 stream_component_open(mAudioStreamIdx);
                 if (!mDefersToCreateAudioTrack)
-                    ALOGI("probe packet counter: %d when create audio track ok", mProbePkts);
+                    ALOGI("probe packet counter: %zu when create audio track ok", mProbePkts);
                 if (mProbePkts == EXTRACTOR_MAX_PROBE_PACKETS)
-                    ALOGI("probe packet counter to max: %d, create audio track: %d",
+                    ALOGI("probe packet counter to max: %zu, create audio track: %d",
                         mProbePkts, !mDefersToCreateAudioTrack);
             }
         }
@@ -1364,7 +1364,7 @@ FFmpegSource::FFmpegSource(
             // The number of bytes used to encode the length of a NAL unit.
             mNALLengthSize = 1 + (ptr[4] & 3);
 
-            ALOGV("the stream is AVC, the length of a NAL unit: %d", mNALLengthSize);
+            ALOGV("the stream is AVC, the length of a NAL unit: %zu", mNALLengthSize);
 
             mNal2AnnexB = true;
         } else if (avctx->codec_id == AV_CODEC_ID_HEVC
@@ -1390,7 +1390,7 @@ FFmpegSource::FFmpegSource(
             // The number of bytes used to encode the length of a NAL unit.
             mNALLengthSize = 1 + (ptr[21] & 3);
 
-            ALOGD("the stream is HEVC, the length of a NAL unit: %d", mNALLengthSize);
+            ALOGD("the stream is HEVC, the length of a NAL unit: %zu", mNALLengthSize);
 
             mNal2AnnexB = true;
         }
@@ -1443,12 +1443,12 @@ status_t FFmpegSource::read(
 
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
         int64_t seekPTS = seekTimeUs;
-        ALOGV("~~~%s seekTimeUs: %lld, seekPTS: %lld, mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, seekPTS, mode);
+        ALOGV("~~~%s seekTimeUs: %" PRId64 ", seekPTS: %" PRId64 ", mode: %d", av_get_media_type_string(mMediaType), seekTimeUs, seekPTS, mode);
         /* add the stream start time */
         if (mStream->start_time != AV_NOPTS_VALUE) {
             seekPTS += startTimeUs;
         }
-        ALOGV("~~~%s seekTimeUs[+startTime]: %lld, mode: %d start_time=%lld", av_get_media_type_string(mMediaType), seekPTS, mode, startTimeUs);
+        ALOGV("~~~%s seekTimeUs[+startTime]: %" PRId64 ", mode: %d start_time=%" PRId64, av_get_media_type_string(mMediaType), seekPTS, mode, startTimeUs);
         seeking = (mExtractor->stream_seek(seekPTS, mMediaType, mode) == SEEK);
     }
 
@@ -1510,7 +1510,7 @@ retry:
     if ((mIsAVC || mIsHEVC) && mNal2AnnexB) {
         /* This only works for NAL sizes 3-4 */
         if ((mNALLengthSize != 3) && (mNALLengthSize != 4)) {
-            ALOGE("cannot use convertNal2AnnexB, nal size: %d", mNALLengthSize);
+            ALOGE("cannot use convertNal2AnnexB, nal size: %zu", mNALLengthSize);
             mediaBuffer->release();
             mediaBuffer = NULL;
             av_packet_unref(&pkt);
@@ -1588,7 +1588,7 @@ retry:
         if (timeUs == mTargetTime) {
             mTargetTime = AV_NOPTS_VALUE;
         } else if (nextPTS != AV_NOPTS_VALUE && nextPTS > mTargetTime) {
-            ALOGV("adjust target frame time to %lld", timeUs);
+            ALOGV("adjust target frame time to %" PRId64, timeUs);
             mediaBuffer->meta_data()->setInt64(kKeyTime, mTargetTime);
             mTargetTime = AV_NOPTS_VALUE;
         }
