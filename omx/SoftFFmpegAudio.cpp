@@ -38,6 +38,7 @@ namespace android {
 
 template<class T>
 static void InitOMXParams(T *params) {
+    memset(params, 0, sizeof(T));
     params->nSize = sizeof(T);
     params->nVersion.s.nVersionMajor = 1;
     params->nVersion.s.nVersionMinor = 0;
