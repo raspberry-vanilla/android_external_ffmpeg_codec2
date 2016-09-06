@@ -602,5 +602,46 @@ status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
     return OK;
 }
 
+AudioEncoding sampleFormatToEncoding(AVSampleFormat fmt) {
+
+    // we resample planar formats to interleaved
+    switch (fmt) {
+        case AV_SAMPLE_FMT_U8:
+        case AV_SAMPLE_FMT_U8P:
+            return kAudioEncodingPcm8bit;
+        case AV_SAMPLE_FMT_S16:
+        case AV_SAMPLE_FMT_S16P:
+            return kAudioEncodingPcm16bit;
+        case AV_SAMPLE_FMT_S32:
+        case AV_SAMPLE_FMT_S32P:
+            return kAudioEncodingPcm32bit;
+        case AV_SAMPLE_FMT_FLT:
+        case AV_SAMPLE_FMT_FLTP:
+            return kAudioEncodingPcmFloat;
+        case AV_SAMPLE_FMT_DBL:
+        case AV_SAMPLE_FMT_DBLP:
+            return kAudioEncodingPcmFloat;
+        default:
+            return kAudioEncodingInvalid;
+    }
+
+}
+
+AVSampleFormat encodingToSampleFormat(AudioEncoding encoding) {
+    switch (encoding) {
+        case kAudioEncodingPcm8bit:
+            return AV_SAMPLE_FMT_U8;
+        case kAudioEncodingPcm16bit:
+            return AV_SAMPLE_FMT_S16;
+        case kAudioEncodingPcm24bitPacked:
+        case kAudioEncodingPcm32bit:
+            return AV_SAMPLE_FMT_S32;
+        case kAudioEncodingPcmFloat:
+            return AV_SAMPLE_FMT_FLT;
+        default:
+            return AV_SAMPLE_FMT_NONE;
+    }
+}
+
 }  // namespace android
 

@@ -25,8 +25,8 @@
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/stagefright/ACodec.h>
 #include <media/stagefright/MediaDefs.h>
-#include <media/stagefright/OMXCodec.h>
 
 #include <OMX_AudioExt.h>
 #include <OMX_IndexExt.h>
@@ -275,22 +275,31 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->eEndian = OMX_EndianBig;
             profile->bInterleaved = OMX_TRUE;
             profile->ePCMMode = OMX_AUDIO_PCMModeLinear;
+			profile->nBitPerSample = 32;
+            profile->eNumData = OMX_NumericalDataFloat;
 
             if (isConfigured()) {
-                AVSampleFormat packed = av_get_packed_sample_fmt(mAudioTgtFmt);
-                if (packed == AV_SAMPLE_FMT_U8)
-                    profile->nBitPerSample = 8;
-                else if (packed == AV_SAMPLE_FMT_S16)
-                    profile->nBitPerSample = 16;
-                else if (packed == AV_SAMPLE_FMT_S32)
-                    profile->nBitPerSample = 24;
-                else
-                    profile->nBitPerSample = av_get_bytes_per_sample(mAudioTgtFmt) * 8;
-            } else {
-                profile->nBitPerSample = 32;
+                switch (av_get_packed_sample_fmt(mAudioTgtFmt)) {
+                    case AV_SAMPLE_FMT_U8:
+                        profile->nBitPerSample = 8;
+                        profile->eNumData = OMX_NumericalDataUnsigned;
+                        break;
+                    case AV_SAMPLE_FMT_S16:
+                        profile->nBitPerSample = 16;
+                        profile->eNumData = OMX_NumericalDataSigned;
+                        break;
+                    case AV_SAMPLE_FMT_S32:
+                        profile->nBitPerSample = 32;
+                        profile->eNumData = OMX_NumericalDataSigned;
+                        break;
+                    default:
+                        profile->nBitPerSample = 32;
+                        profile->eNumData = OMX_NumericalDataFloat;
+                        break;
+                }
             }
 
-            if (getOMXChannelMapping(mAudioTgtChannels, profile->eChannelMapping) != OK) {
+            if (ACodec::getOMXChannelMapping(mAudioTgtChannels, profile->eChannelMapping) != OK) {
                 return OMX_ErrorNone;
             }
 
@@ -298,7 +307,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nSamplingRate = mAudioTgtFreq;
 
             //mCtx has been updated(adjustAudioParams)!
-            ALOGV("get pcm params, nChannels:%u, nSamplingRate:%u, nBitsPerSample:%u",
+            ALOGV("get pcm params, nChannels:%u, nSamplingRate:%u, nBitPerSample:%u",
                    profile->nChannels, profile->nSamplingRate, profile->nBitPerSample);
 
             return OMX_ErrorNone;
@@ -419,7 +428,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
-
+            profile->nCompressionLevel = mCtx->bits_per_raw_sample;
             return OMX_ErrorNone;
         }
 
@@ -598,21 +607,33 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
                 return OMX_ErrorUndefined;
             }
 
-            if (profile->nBitPerSample == 24) {
-                mAudioTgtFmt = AV_SAMPLE_FMT_S32;
-            } else if (profile->nBitPerSample == 32) {
-                mAudioTgtFmt = AV_SAMPLE_FMT_FLT;
-            } else if (profile->nBitPerSample == 8) {
-                mAudioTgtFmt = AV_SAMPLE_FMT_U8;
-            } else {
-                mAudioTgtFmt = AV_SAMPLE_FMT_S16;
+            switch (profile->nBitPerSample) {
+                case 8:
+                    mAudioTgtFmt = AV_SAMPLE_FMT_U8;
+                    break;
+                case 16:
+                    mAudioTgtFmt = AV_SAMPLE_FMT_S16;
+                    break;
+                case 24:
+                    mAudioTgtFmt = AV_SAMPLE_FMT_S32;
+                    break;
+                case 32:
+                    if (profile->eNumData == OMX_NumericalDataFloat) {
+                        mAudioTgtFmt = AV_SAMPLE_FMT_FLT;
+                        break;
+                    }
+                    mAudioTgtFmt = AV_SAMPLE_FMT_S32;
+                    break;
+                default:
+                    ALOGE("Unknown PCM encoding, assuming floating point");
+                    mAudioTgtFmt = AV_SAMPLE_FMT_FLT;
             }
 
             mAudioTgtFreq = profile->nSamplingRate;
             mAudioTgtChannels = profile->nChannels;
 
             ALOGV("set OMX_IndexParamAudioPcm, nChannels:%u, "
-                    "nSampleRate:%u, nBitsPerSample:%u",
+                    "nSampleRate:%u, nBitPerSample:%u",
                 profile->nChannels, profile->nSamplingRate,
                 profile->nBitPerSample);
 
