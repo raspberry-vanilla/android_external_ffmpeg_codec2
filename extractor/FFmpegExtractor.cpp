@@ -571,7 +571,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);
         meta->setInt32(kKeyPcmEncoding, sampleFormatToEncoding(avctx->sample_fmt));
-        meta->setCString(kKeyFileFormat, findMatchingContainer(mFormatCtx->iformat->name));
+        meta->setCString('ffmt', findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
     }
 
