@@ -37,7 +37,7 @@ struct FFmpegExtractor : public MediaExtractor {
     FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage> &meta);
 
     virtual size_t countTracks();
-    virtual sp<MediaSource> getTrack(size_t index);
+    virtual sp<IMediaSource> getTrack(size_t index);
     virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
 
     virtual sp<MetaData> getMetaData();
@@ -135,11 +135,18 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
 };
 
+extern "C" {
+
 static const char *findMatchingContainer(const char *name);
 
 bool SniffFFMPEG(
         const sp<DataSource> &source, String8 *mimeType, float *confidence,
         sp<AMessage> *);
+
+MediaExtractor* CreateFFMPEGExtractor(const sp<DataSource> &source,
+        const char *mime, const sp<AMessage> &meta);
+
+}
 
 }  // namespace android
 

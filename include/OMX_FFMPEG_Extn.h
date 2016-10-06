@@ -47,6 +47,7 @@ enum OMX_FFMPEG_AUDIO_CODINGTYPE
     OMX_AUDIO_CodingAC3  = 0x7F000002,
     OMX_AUDIO_CodingAPE  = 0x7F000003,
     OMX_AUDIO_CodingDTS  = 0x7F000004,
+    OMX_AUDIO_CodingALAC = 0x7F000005,
 };
 
 /** MP2 params */
@@ -90,6 +91,20 @@ typedef struct OMX_AUDIO_PARAM_APETYPE {
     OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
 } OMX_AUDIO_PARAM_APETYPE;
 
+/** ALAC params */
+typedef struct OMX_AUDIO_PARAM_ALACTYPE {
+    OMX_U32 nSize;                /**< size of the structure in bytes */
+    OMX_VERSIONTYPE nVersion;     /**< OMX specification version information */
+    OMX_U32 nPortIndex;           /**< port that this structure applies to */
+    OMX_U32 nChannels;            /**< Number of channels */
+    OMX_U32 nBitRate;             /**< Bit rate of the input data.  Use 0 for variable
+                                       rate or unknown bit rates */
+    OMX_U32 nSamplingRate;        /**< Sampling rate of the source data.  Use 0 for
+                                       variable or unknown sampling rate. */
+    OMX_U32 nBitsPerSample;       /**< Number of bits in each sample */
+    OMX_AUDIO_CHANNELMODETYPE eChannelMode;   /**< Channel mode enumeration */
+} OMX_AUDIO_PARAM_ALACTYPE;
+
 /** DTS params */
 typedef struct OMX_AUDIO_PARAM_DTSTYPE {
     OMX_U32 nSize;                 /**< size of the structure in bytes */
@@ -129,6 +144,7 @@ enum OMX_FFMPEG_INDEXTYPE
     OMX_IndexParamAudioDts     = 0x7FB0004,  /**< reference: OMX_AUDIO_PARAM_DTSTYPE */
     OMX_IndexParamVideoFFmpeg  = 0x7FB0005,  /**< reference: OMX_VIDEO_PARAM_FFMPEGTYPE */
     OMX_IndexParamAudioFFmpeg  = 0x7FB0006,  /**< reference: OMX_AUDIO_PARAM_FFMPEGTYPE */
+    OMX_IndexParamAudioAlac    = 0x7FB0007,  /**< reference: OMX_AUDIO_PARAM_ALACTYPE */
 };
 
 #ifdef __cplusplus

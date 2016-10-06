@@ -15,9 +15,11 @@ LOCAL_C_INCLUDES += \
 LOCAL_SHARED_LIBRARIES := \
 	libutils          \
 	libcutils         \
+	libbinder         \
 	libavcodec        \
 	libavformat       \
 	libavutil         \
+	libmedia          \
 	libffmpeg_utils   \
 	libstagefright    \
 	libstagefright_foundation

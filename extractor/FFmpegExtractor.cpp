@@ -160,7 +160,7 @@ size_t FFmpegExtractor::countTracks() {
     return mInitCheck == OK ? mTracks.size() : 0;
 }
 
-sp<MediaSource> FFmpegExtractor::getTrack(size_t index) {
+sp<IMediaSource> FFmpegExtractor::getTrack(size_t index) {
     ALOGV("FFmpegExtractor::getTrack[%zu]", index);
 
     if (mInitCheck != OK) {
@@ -343,6 +343,7 @@ bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
     case AV_CODEC_ID_FLV1:
     case AV_CODEC_ID_VORBIS:
     case AV_CODEC_ID_HEVC:
+    case AV_CODEC_ID_ALAC:
 
         supported = true;
         break;
@@ -535,6 +536,9 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
     case AV_CODEC_ID_FLAC:
         meta = setFLACFormat(avctx);
         break;
+    case AV_CODEC_ID_ALAC:
+        meta = setALACFormat(avctx);
+        break;
     default:
         ALOGD("unsuppoted audio codec(id:%d, name:%s), but give it a chance",
                 avctx->codec_id, avcodec_get_name(avctx->codec_id));
@@ -562,11 +566,11 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
         int32_t bits = avctx->bits_per_raw_sample > 0 ?
                 avctx->bits_per_raw_sample :
                 av_get_bytes_per_sample(avctx->sample_fmt) * 8;
-        meta->setInt32(kKeyBitsPerSample, bits > 0 ? bits : 16);
+        meta->setInt32(kKeyBitsPerRawSample, bits);
         meta->setInt32(kKeySampleRate, avctx->sample_rate);
         meta->setInt32(kKeyBlockAlign, avctx->block_align);
         meta->setInt32(kKeySampleFormat, avctx->sample_fmt);
-        meta->setInt32('pfmt', to_android_audio_format(avctx->sample_fmt));
+        meta->setInt32(kKeyPcmEncoding, sampleFormatToEncoding(avctx->sample_fmt));
         meta->setCString('ffmt', findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
     }
@@ -1967,6 +1971,9 @@ static void adjustContainerIfNeeded(const char **mime, AVFormatContext *ic)
         case AV_CODEC_ID_WMALOSSLESS:
             newMime = MEDIA_MIMETYPE_AUDIO_WMA;
             break;
+        case AV_CODEC_ID_ALAC:
+            newMime = MEDIA_MIMETYPE_AUDIO_ALAC;
+            break;
         default:
             break;
         }
@@ -2150,6 +2157,8 @@ static const char *LegacySniffFFMPEG(const sp<DataSource> &source,
     return ret;
 }
 
+extern "C" {
+
 bool SniffFFMPEG(
         const sp<DataSource> &source, String8 *mimeType, float *confidence,
         sp<AMessage> *meta) {
@@ -2215,13 +2224,14 @@ bool SniffFFMPEG(
     return true;
 }
 
-MediaExtractor *CreateFFmpegExtractor(const sp<DataSource> &source, const char *mime, const sp<AMessage> &meta) {
+MediaExtractor *CreateFFMPEGExtractor(const sp<DataSource> &source, const char *mime, const sp<AMessage> &meta) {
     MediaExtractor *ret = NULL;
     AString notuse;
     if (meta.get() && meta->findString("extended-extractor", &notuse) && (
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_MPEG)          ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AAC)           ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_VORBIS)        ||
+            !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_ALAC)          ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)          ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AC3)           ||
             !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_APE)           ||
@@ -2261,10 +2271,6 @@ MediaExtractor *CreateFFmpegExtractor(const sp<DataSource> &source, const char *
     return ret;
 }
 
-}  // namespace android
-
-extern "C" void getExtractorPlugin(android::MediaExtractor::Plugin *plugin)
-{
-    plugin->sniff = android::SniffFFMPEG;
-    plugin->create = android::CreateFFmpegExtractor;
 }
+
+};  // namespace android
