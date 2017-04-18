@@ -39,27 +39,16 @@ namespace android {
 class FFSource
 {
 public:
-    FFSource(DataSource *source);
+    void set(DataSource *s) { mSource = s; }
     int init_check();
     int read(unsigned char *buf, size_t size);
     int64_t seek(int64_t pos);
     off64_t getSize();
-    ~FFSource();
+
 protected:
     sp<DataSource> mSource;
     int64_t mOffset;
 };
-
-FFSource::FFSource(DataSource *source)
-    : mSource(source),
-      mOffset(0)
-{
-}
-
-FFSource::~FFSource()
-{
-	mSource = NULL;
-}
 
 int FFSource::init_check()
 {
@@ -150,8 +139,7 @@ static int android_open(URLContext *h, const char *url, int flags __unused)
 
     ALOGV("ffmpeg open android data source success, source ptr: %p", source);
 
-    FFSource *ffs = new FFSource(source);
-    h->priv_data = (void *)ffs;
+    reinterpret_cast<FFSource *>(h->priv_data)->set(source);
 
     ALOGV("android source open success");
 
@@ -182,10 +170,8 @@ static int64_t android_seek(URLContext *h, int64_t pos, int whence)
 
 static int android_close(URLContext *h)
 {
-    FFSource* ffs = (FFSource*)h->priv_data;
     ALOGV("android source close");
-    delete ffs;
-    h->priv_data = NULL;
+    reinterpret_cast<FFSource *>(h->priv_data)->set(NULL);
     return 0;
 }
 
@@ -223,6 +209,7 @@ void ffmpeg_register_android_source()
     ff_android_protocol.url_close           = android_close;
     ff_android_protocol.url_get_file_handle = android_get_handle;
     ff_android_protocol.url_check           = android_check;
+    ff_android_protocol.priv_data_size      = sizeof(FFSource);
 }
 
 }  // namespace android
