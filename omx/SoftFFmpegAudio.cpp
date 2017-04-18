@@ -144,12 +144,6 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     int fast = 0;
 
     avctx->workaround_bugs   = 1;
-    avctx->lowres            = 0;
-    if(avctx->lowres > codec->max_lowres){
-        ALOGW("The maximum value for lowres supported by the decoder is %d",
-                codec->max_lowres);
-        avctx->lowres= codec->max_lowres;
-    }
     avctx->idct_algo         = 0;
     avctx->skip_frame        = AVDISCARD_DEFAULT;
     avctx->skip_idct         = AVDISCARD_DEFAULT;
@@ -158,7 +152,6 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
 
     avctx->flags |= CODEC_FLAG_BITEXACT;
 
-    if(avctx->lowres) avctx->flags |= CODEC_FLAG_EMU_EDGE;
     if (fast)   avctx->flags2 |= CODEC_FLAG2_FAST;
     if(codec->capabilities & CODEC_CAP_DR1)
         avctx->flags |= CODEC_FLAG_EMU_EDGE;
