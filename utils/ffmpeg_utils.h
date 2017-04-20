@@ -50,7 +50,11 @@ extern "C" {
 #include "libavutil/internal.h"
 #include "libavcodec/avfft.h"
 #include "libavcodec/xiph.h"
+#ifdef LIBAV_CONFIG_H
+#include "libavresample/avresample.h"
+#else
 #include "libswresample/swresample.h"
+#endif
 
 #include <system/audio.h>
 

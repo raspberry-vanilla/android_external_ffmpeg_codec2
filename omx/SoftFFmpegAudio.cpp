@@ -150,11 +150,13 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->skip_loop_filter  = AVDISCARD_DEFAULT;
     avctx->error_concealment = 3;
 
-    avctx->flags |= CODEC_FLAG_BITEXACT;
+    avctx->flags |= AV_CODEC_FLAG_BITEXACT;
 
-    if (fast)   avctx->flags2 |= CODEC_FLAG2_FAST;
-    if(codec->capabilities & CODEC_CAP_DR1)
+    if (fast) avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+#ifdef CODEC_FLAG_EMU_EDGE
+    if (codec->capabilities & AV_CODEC_CAP_DR1)
         avctx->flags |= CODEC_FLAG_EMU_EDGE;
+#endif
 }
 
 bool SoftFFmpegAudio::isConfigured() {
@@ -245,10 +247,13 @@ void SoftFFmpegAudio::deInitDecoder() {
         av_frame_free(&mFrame);
         mFrame = NULL;
     }
+#ifdef LIBAV_CONFIG_H
+#else
     if (mSwrCtx) {
         swr_free(&mSwrCtx);
         mSwrCtx = NULL;
     }
+#endif
 }
 
 OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
@@ -993,7 +998,7 @@ int32_t SoftFFmpegAudio::handleExtradata() {
                 int orig_extradata_size = mCtx->extradata_size;
                 mCtx->extradata_size += inHeader->nFilledLen;
                 mCtx->extradata = (uint8_t *)av_realloc(mCtx->extradata,
-                    mCtx->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
+                    mCtx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
                 if (!mCtx->extradata) {
                     ALOGE("ffmpeg audio decoder failed to alloc extradata memory.");
                     return ERR_OOM;
@@ -1001,7 +1006,7 @@ int32_t SoftFFmpegAudio::handleExtradata() {
 
                 memcpy(mCtx->extradata + orig_extradata_size,
                     inHeader->pBuffer + inHeader->nOffset, inHeader->nFilledLen);
-                memset(mCtx->extradata + mCtx->extradata_size, 0, FF_INPUT_BUFFER_PADDING_SIZE);
+                memset(mCtx->extradata + mCtx->extradata_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
             }
         }
     }
@@ -1140,7 +1145,7 @@ int32_t SoftFFmpegAudio::decodeAudio() {
     }
 
     if (mEOSStatus == INPUT_EOS_SEEN && (!inHeader || inHeader->nFilledLen == 0)
-        && !(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
+        && !(mCtx->codec->capabilities & AV_CODEC_CAP_DELAY)) {
         return ERR_FLUSHED;
     }
 
@@ -1166,7 +1171,7 @@ int32_t SoftFFmpegAudio::decodeAudio() {
             ALOGI("ffmpeg audio decoder failed to get frame.");
 #endif
             //stop sending empty packets if the decoder is finished
-            if (is_flush && mCtx->codec->capabilities & CODEC_CAP_DELAY) {
+            if (is_flush && mCtx->codec->capabilities & AV_CODEC_CAP_DELAY) {
                 ALOGI("ffmpeg audio decoder failed to get more frames when flush.");
                 ret = ERR_FLUSHED;
             } else {
@@ -1203,6 +1208,10 @@ int32_t SoftFFmpegAudio::decodeAudio() {
     return ret;
 }
 
+#ifdef LIBAV_CONFIG_H
+#define av_frame_get_channels(f) av_get_channel_layout_nb_channels(f->channel_layout)
+#endif
+
 int32_t SoftFFmpegAudio::resampleAudio() {
     int channels = 0;
     int64_t channelLayout = 0;
@@ -1230,6 +1239,9 @@ int32_t SoftFFmpegAudio::resampleAudio() {
                 || mAudioSrcFmt != mAudioTgtFmt
                 || mAudioSrcChannelLayout != mAudioTgtChannelLayout
                 || mAudioSrcFreq != mAudioTgtFreq))) {
+#ifdef LIBAV_CONFIG_H
+        if (!mSwrCtx) {
+#else
         if (mSwrCtx) {
             swr_free(&mSwrCtx);
         }
@@ -1238,6 +1250,7 @@ int32_t SoftFFmpegAudio::resampleAudio() {
                 channelLayout,       (enum AVSampleFormat)mFrame->format, mFrame->sample_rate,
                 0, NULL);
         if (!mSwrCtx || swr_init(mSwrCtx) < 0) {
+#endif
             ALOGE("Cannot create sample rate converter for conversion "
                     "of %d Hz %s %d channels to %d Hz %s %d channels!",
                     mFrame->sample_rate,
@@ -1275,6 +1288,8 @@ int32_t SoftFFmpegAudio::resampleAudio() {
     }
 
     if (mSwrCtx) {
+#ifdef LIBAV_CONFIG_H
+#else
         const uint8_t **in = (const uint8_t **)mFrame->extended_data;
         uint8_t *out[] = {mAudioBuffer};
         int out_count = sizeof(mAudioBuffer) / mAudioTgtChannels / av_get_bytes_per_sample(mAudioTgtFmt);
@@ -1305,6 +1320,7 @@ int32_t SoftFFmpegAudio::resampleAudio() {
                 av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
                 mAudioTgtChannels,
                 av_get_sample_fmt_name(mAudioTgtFmt));
+#endif
 #endif
     } else {
         mResampledData = mFrame->data[0];

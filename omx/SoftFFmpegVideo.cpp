@@ -93,9 +93,11 @@ void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
     avctx->error_concealment = 3;
     avctx->thread_count      = 0;
 
-    if (fast)   avctx->flags2 |= CODEC_FLAG2_FAST;
-    if(codec->capabilities & CODEC_CAP_DR1)
+    if (fast)   avctx->flags2 |= AV_CODEC_FLAG2_FAST;
+#ifdef CODEC_FLAG_EMU_EDGE
+    if (codec->capabilities & AV_CODEC_CAP_DR1)
         avctx->flags |= CODEC_FLAG_EMU_EDGE;
+#endif
 }
 
 status_t SoftFFmpegVideo::initDecoder(enum AVCodecID codecID) {
@@ -359,7 +361,7 @@ int32_t SoftFFmpegVideo::handleExtradata() {
             int orig_extradata_size = mCtx->extradata_size;
             mCtx->extradata_size += inHeader->nFilledLen;
             mCtx->extradata = (uint8_t *)realloc(mCtx->extradata,
-                    mCtx->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
+                    mCtx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
             if (!mCtx->extradata) {
                 ALOGE("ffmpeg video decoder failed to alloc extradata memory.");
                 return ERR_OOM;
@@ -369,7 +371,7 @@ int32_t SoftFFmpegVideo::handleExtradata() {
                     inHeader->pBuffer + inHeader->nOffset,
                     inHeader->nFilledLen);
             memset(mCtx->extradata + mCtx->extradata_size, 0,
-                    FF_INPUT_BUFFER_PADDING_SIZE);
+                    AV_INPUT_BUFFER_PADDING_SIZE);
         }
     }
 
@@ -464,7 +466,7 @@ int32_t SoftFFmpegVideo::decodeVideo() {
     }
 
     if (mEOSStatus == INPUT_EOS_SEEN && (!inHeader || inHeader->nFilledLen == 0)
-        && !(mCtx->codec->capabilities & CODEC_CAP_DELAY)) {
+        && !(mCtx->codec->capabilities & AV_CODEC_CAP_DELAY)) {
         return ERR_FLUSHED;
     }
 
@@ -484,7 +486,7 @@ int32_t SoftFFmpegVideo::decodeVideo() {
         if (!gotPic) {
             ALOGI("ffmpeg video decoder failed to get frame.");
             //stop sending empty packets if the decoder is finished
-            if ((mEOSStatus != INPUT_DATA_AVAILABLE && (mCtx->codec->capabilities & CODEC_CAP_DELAY) &&
+            if ((mEOSStatus != INPUT_DATA_AVAILABLE && (mCtx->codec->capabilities & AV_CODEC_CAP_DELAY) &&
                 !inHeader) || inHeader->nFilledLen == 0) {
                 ret = ERR_FLUSHED;
             } else {
@@ -548,9 +550,12 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     }
 
     //process timestamps
+#ifndef LIBAV_CONFIG_H
     if (decoder_reorder_pts == -1) {
         pts = av_frame_get_best_effort_timestamp(mFrame);
-    } else if (decoder_reorder_pts) {
+    } else
+#endif
+    if (decoder_reorder_pts) {
         pts = mFrame->pkt_pts;
     } else {
         pts = mFrame->pkt_dts;

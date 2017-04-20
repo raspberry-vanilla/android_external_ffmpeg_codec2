@@ -14,7 +14,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_SHARED_LIBRARIES += \
 	libdl             \
 	libffmpeg_utils   \
-	libswresample     \
+	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
 	libswscale        \
 	libstagefright_omx
 

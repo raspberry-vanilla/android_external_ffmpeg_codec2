@@ -51,7 +51,7 @@
 #define MIN_AUDIOQ_SIZE (2 * 1024 * 1024)
 #define MIN_FRAMES 5
 #define EXTRACTOR_MAX_PROBE_PACKETS 200
-#define FF_MAX_EXTRADATA_SIZE ((1 << 28) - FF_INPUT_BUFFER_PADDING_SIZE)
+#define FF_MAX_EXTRADATA_SIZE ((1 << 28) - AV_INPUT_BUFFER_PADDING_SIZE)
 
 #define WAIT_KEY_PACKET_AFTER_SEEK 1
 #define SUPPOURT_UNKNOWN_FORMAT    1
@@ -1263,7 +1263,7 @@ void FFmpegExtractor::readerEntry() {
                     if (avctx->extradata)
                         av_freep(&avctx->extradata);
                     avctx->extradata_size= i;
-                    avctx->extradata = (uint8_t *)av_malloc(avctx->extradata_size + FF_INPUT_BUFFER_PADDING_SIZE);
+                    avctx->extradata = (uint8_t *)av_malloc(avctx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
                     if (!avctx->extradata) {
                         //return AVERROR(ENOMEM);
                         ret = AVERROR(ENOMEM);
@@ -1271,7 +1271,7 @@ void FFmpegExtractor::readerEntry() {
                     }
                     // sps + pps(there may be sei in it)
                     memcpy(avctx->extradata, pkt->data, avctx->extradata_size);
-                    memset(avctx->extradata + i, 0, FF_INPUT_BUFFER_PADDING_SIZE);
+                    memset(avctx->extradata + i, 0, AV_INPUT_BUFFER_PADDING_SIZE);
                 } else {
                     av_packet_unref(pkt);
                     continue;
@@ -1506,7 +1506,7 @@ retry:
         mFirstKeyPktTimestamp = pktTS;
     }
 
-    MediaBuffer *mediaBuffer = new MediaBuffer(pkt.size + FF_INPUT_BUFFER_PADDING_SIZE);
+    MediaBuffer *mediaBuffer = new MediaBuffer(pkt.size + AV_INPUT_BUFFER_PADDING_SIZE);
     mediaBuffer->meta_data()->clear();
     mediaBuffer->set_range(0, pkt.size);
 
