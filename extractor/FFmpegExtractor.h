@@ -95,7 +95,6 @@ private:
     bool mVideoEOSReceived;
     bool mAudioEOSReceived;
 
-    bool mFFmpegInited;
     AVFormatContext *mFormatCtx;
     int mVideoStreamIdx;
     int mAudioStreamIdx;

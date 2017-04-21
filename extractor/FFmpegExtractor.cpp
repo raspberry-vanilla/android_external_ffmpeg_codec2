@@ -114,7 +114,6 @@ FFmpegExtractor::FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage
     : mDataSource(source),
       mMeta(new MetaData),
       mInitCheck(NO_INIT),
-      mFFmpegInited(false),
       mFormatCtx(NULL),
       mReaderThreadStarted(false),
       mParsedMetadata(false) {
@@ -921,7 +920,6 @@ int FFmpegExtractor::initStreams()
 {
     int err = 0;
     int i = 0;
-    status_t status = UNKNOWN_ERROR;
     int eof = 0;
     int ret = 0, audio_ret = -1, video_ret = -1;
     int pkt_in_play_range = 0;
@@ -938,13 +936,6 @@ int FFmpegExtractor::initStreams()
     const char *mime = NULL;
 
     setFFmpegDefaultOpts();
-
-    status = initFFmpeg();
-    if (status != OK) {
-        ret = -1;
-        goto fail;
-    }
-    mFFmpegInited = true;
 
     mFormatCtx = avformat_alloc_context();
     if (!mFormatCtx)
@@ -1061,10 +1052,6 @@ void FFmpegExtractor::deInitStreams()
 
     if (mFormatCtx) {
         avformat_close_input(&mFormatCtx);
-    }
-
-    if (mFFmpegInited) {
-        deInitFFmpeg();
     }
 }
 
@@ -2023,7 +2010,7 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
     AVDictionary **opts = NULL;
     bool needProbe = false;
 
-    status_t status = initFFmpeg();
+    static status_t status = initFFmpeg();
     if (status != OK) {
         ALOGE("could not init ffmpeg");
         return NULL;
@@ -2102,9 +2089,6 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
 fail:
     if (ic) {
         avformat_close_input(&ic);
-    }
-    if (status == OK) {
-        deInitFFmpeg();
     }
 
     return container;
