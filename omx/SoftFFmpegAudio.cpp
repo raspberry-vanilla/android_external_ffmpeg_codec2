@@ -1151,7 +1151,6 @@ int32_t SoftFFmpegAudio::decodeAudio() {
 
     AVPacket pkt;
     initPacket(&pkt, inHeader);
-    av_frame_unref(mFrame);
 
     len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, &pkt);
     av_packet_unref(&pkt);

@@ -473,8 +473,6 @@ int32_t SoftFFmpegVideo::decodeVideo() {
     AVPacket pkt;
     initPacket(&pkt, inHeader);
 
-    av_frame_unref(mFrame);
-
     err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
     av_packet_unref(&pkt);
 
