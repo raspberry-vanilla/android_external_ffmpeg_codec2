@@ -1,5 +1,6 @@
 /*
  * Copyright 2012 Michael Chen <omxcodec@gmail.com>
+ * Copyright 2015 The CyanogenMod Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,15 +28,30 @@
 
 #include "utils/ffmpeg_utils.h"
 
+#include <OMX_AudioExt.h>
+#include <OMX_IndexExt.h>
+
 const int AVCODEC_MAX_AUDIO_FRAME_SIZE = 192000; // Deprecated in ffmpeg
 
 namespace android {
 
 struct SoftFFmpegAudio : public SimpleSoftOMXComponent {
     SoftFFmpegAudio(const char *name,
+            const char* componentRole,
+            OMX_AUDIO_CODINGTYPE codingType,
+            enum AVCodecID codecID,
             const OMX_CALLBACKTYPE *callbacks,
             OMX_PTR appData,
             OMX_COMPONENTTYPE **component);
+
+public:
+    static int64_t *sAudioClock;
+    static int64_t getAudioClock(void);
+    static void setAudioClock(int64_t value);
+
+    static SoftOMXComponent* createSoftOMXComponent(
+            const char *name, const OMX_CALLBACKTYPE *callbacks,
+            OMX_PTR appData, OMX_COMPONENTTYPE **component);
 
 protected:
     virtual ~SoftFFmpegAudio();
@@ -49,6 +65,7 @@ protected:
     virtual void onQueueFilled(OMX_U32 portIndex);
     virtual void onPortFlushCompleted(OMX_U32 portIndex);
     virtual void onPortEnableCompleted(OMX_U32 portIndex, bool enabled);
+    virtual void onReset();
 
 private:
     enum {
@@ -56,23 +73,8 @@ private:
         kOutputPortIndex  = 1,
         kNumInputBuffers  = 4,
         kNumOutputBuffers = 4,
-        kOutputBufferSize = 4608 * 2
+        kOutputBufferSize = 9216 * 2
     };
-
-    enum {
-        MODE_NONE,
-        MODE_AAC,
-        MODE_MPEG,
-        MODE_VORBIS,
-        MODE_WMA,
-        MODE_RA,
-        MODE_FLAC,
-        MODE_MPEGL2,
-        MODE_AC3,
-        MODE_APE,
-        MODE_DTS,
-        MODE_TRIAL
-    } mMode;
 
     enum EOSStatus {
         INPUT_DATA_AVAILABLE,
@@ -92,6 +94,8 @@ private:
         ERR_RESAMPLE_FAILED     = -6
     };
 
+    const char* mRole;
+    OMX_AUDIO_CODINGTYPE mCodingType;
     bool mFFmpegAlreadyInited;
     bool mCodecAlreadyOpened;
     bool mExtradataReady;
@@ -107,7 +111,6 @@ private:
 
     bool mSignalledError;
 
-    int64_t mAudioClock;
     int32_t mInputBufferSize;
 
     //"Fatal signal 7 (SIGBUS)"!!! SIGBUS is because of an alignment exception
@@ -120,10 +123,10 @@ private:
     uint8_t *mResampledData;
     int32_t mResampledDataSize;
 
-    int mAudioSrcFreq;
-    int mAudioTgtFreq;
-    int mAudioSrcChannels;
-    int mAudioTgtChannels;
+    uint32_t mAudioSrcFreq;
+    uint32_t mAudioTgtFreq;
+    uint32_t mAudioSrcChannels;
+    uint32_t mAudioTgtChannels;
     int64_t mAudioSrcChannelLayout;
     int64_t mAudioTgtChannelLayout;
     enum AVSampleFormat mAudioSrcFmt;
@@ -135,16 +138,18 @@ private:
         AWAITING_ENABLED
     } mOutputPortSettingsChange;
 
+    bool mReconfiguring;
+
     void setMode(const char *name);
-	void initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE &def);
+    void initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE &def);
     void setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec);
-	void resetCtx();
-	OMX_ERRORTYPE isRoleSupported(const OMX_PARAM_COMPONENTROLETYPE *roleParams);
-	void adjustAudioParams();
+    void resetCtx();
+    OMX_ERRORTYPE isRoleSupported(const OMX_PARAM_COMPONENTROLETYPE *roleParams);
+    void adjustAudioParams();
     bool isConfigured();
 
     void initPorts();
-    status_t initDecoder();
+    status_t initDecoder(enum AVCodecID codecID);
     void deInitDecoder();
 
     void    initVorbisHdr();
@@ -152,9 +157,9 @@ private:
     int32_t handleExtradata();
     int32_t handleVorbisExtradata(OMX_BUFFERHEADERTYPE *inHeader);
     int32_t openDecoder();
-	void    updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader);
-	void    initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
-	int32_t decodeAudio();
+    void    updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader);
+    void    initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
+    int32_t decodeAudio();
     int32_t resampleAudio();
     void    drainOneOutputBuffer();
     void    drainEOSOutputBuffer();

@@ -22,8 +22,7 @@ extern "C" {
 struct AVDictionary;
 struct AVFormatContext;
 
-extern AVDictionary *format_opts, *codec_opts;
-
+double get_rotation(AVStream *st);
 AVDictionary **setup_find_stream_info_opts(AVFormatContext *, AVDictionary *);
 
 #ifdef __cplusplus

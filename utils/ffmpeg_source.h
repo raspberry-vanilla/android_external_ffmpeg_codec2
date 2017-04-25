@@ -20,7 +20,7 @@
 
 namespace android {
 
-void ffmpeg_register_android_source();
+void ffmpeg_register_android_source(void);
 
 }  // namespace android
 

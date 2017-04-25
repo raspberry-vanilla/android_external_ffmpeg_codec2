@@ -23,12 +23,14 @@ extern "C" {
 
 #include "config.h"
 #include "libavcodec/xiph.h"
+#include "libavutil/intreadwrite.h"
 
 #ifdef __cplusplus
 }
 #endif
 
 #include <utils/Errors.h>
+#include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -79,22 +81,6 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
     return esds;
 }
 
-//Returns the sample rate based on the sampling frequency index
-static uint32_t getAACSampleRate(const uint8_t sf_index)
-{
-    static const uint32_t sample_rates[] =
-    {
-        96000, 88200, 64000, 48000, 44100, 32000,
-        24000, 22050, 16000, 12000, 11025, 8000
-    };
-
-    if (sf_index < sizeof(sample_rates) / sizeof(sample_rates[0])) {
-        return sample_rates[sf_index];
-    }
-
-    return 0;
-}
-
 //video
 
 //H.264 Video Types
@@ -105,9 +91,9 @@ sp<MetaData> setAVCFormat(AVCodecContext *avctx)
 {
     ALOGV("AVC");
 
-	CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
-	CHECK_GT(avctx->extradata_size, 0);
-	CHECK_EQ(avctx->extradata[0], 1); //configurationVersion
+    CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
+    CHECK_GT(avctx->extradata_size, 0);
+    CHECK_EQ(avctx->extradata[0], 1); //configurationVersion
 
     if (avctx->width == 0 || avctx->height == 0) {
          int32_t width, height;
@@ -122,7 +108,7 @@ sp<MetaData> setAVCFormat(AVCodecContext *avctx)
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
     meta->setData(kKeyAVCC, kTypeAVCC, avctx->extradata, avctx->extradata_size);
 
-	return meta;
+    return meta;
 }
 
 // H.264 bitstream with start codes.
@@ -130,8 +116,8 @@ sp<MetaData> setH264Format(AVCodecContext *avctx)
 {
     ALOGV("H264");
 
-	CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
-	CHECK_NE(avctx->extradata[0], 1); //configurationVersion
+    CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
+    CHECK_NE(avctx->extradata[0], 1); //configurationVersion
 
     sp<ABuffer> buffer = new ABuffer(avctx->extradata_size);
     memcpy(buffer->data(), avctx->extradata, avctx->extradata_size);
@@ -148,12 +134,18 @@ sp<MetaData> setMPEG4Format(AVCodecContext *avctx)
 
     sp<MetaData> meta = new MetaData;
     meta->setData(kKeyESDS, kTypeESDS, esds->data(), esds->size());
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
 
+    int divxVersion = getDivXVersion(avctx);
+    if (divxVersion >= 0) {
+        meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_DIVX);
+        meta->setInt32(kKeyDivXVersion, divxVersion);
+    } else {
+        meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
+    }
     return meta;
 }
 
-sp<MetaData> setH263Format(AVCodecContext *avctx)
+sp<MetaData> setH263Format(AVCodecContext *avctx __unused)
 {
     ALOGV("H263");
 
@@ -189,7 +181,7 @@ sp<MetaData> setVC1Format(AVCodecContext *avctx)
     return meta;
 }
 
-sp<MetaData> setWMV1Format(AVCodecContext *avctx)
+sp<MetaData> setWMV1Format(AVCodecContext *avctx __unused)
 {
     ALOGV("WMV1");
 
@@ -277,14 +269,34 @@ sp<MetaData> setHEVCFormat(AVCodecContext *avctx)
 
     sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta->setData(kKeyHVCC, kTypeHVCC, avctx->extradata, avctx->extradata_size);
+
+    return meta;
+}
+
+sp<MetaData> setVP8Format(AVCodecContext *avctx __unused)
+{
+    ALOGV("VP8");
+
+    sp<MetaData> meta = new MetaData;
+    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
+
+    return meta;
+}
+
+sp<MetaData> setVP9Format(AVCodecContext *avctx __unused)
+{
+    ALOGV("VP9");
+
+    sp<MetaData> meta = new MetaData;
+    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
 
     return meta;
 }
 
 //audio
 
-sp<MetaData> setMP2Format(AVCodecContext *avctx)
+sp<MetaData> setMP2Format(AVCodecContext *avctx __unused)
 {
     ALOGV("MP2");
 
@@ -294,7 +306,7 @@ sp<MetaData> setMP2Format(AVCodecContext *avctx)
     return meta;
 }
 
-sp<MetaData> setMP3Format(AVCodecContext *avctx)
+sp<MetaData> setMP3Format(AVCodecContext *avctx __unused)
 {
     ALOGV("MP3");
 
@@ -308,7 +320,7 @@ sp<MetaData> setVORBISFormat(AVCodecContext *avctx)
 {
     ALOGV("VORBIS");
 
-    uint8_t *header_start[3];
+    const uint8_t *header_start[3];
     int header_len[3];
     if (avpriv_split_xiph_headers(avctx->extradata,
                 avctx->extradata_size, 30,
@@ -327,7 +339,7 @@ sp<MetaData> setVORBISFormat(AVCodecContext *avctx)
     return meta;
 }
 
-sp<MetaData> setAC3Format(AVCodecContext *avctx)
+sp<MetaData> setAC3Format(AVCodecContext *avctx __unused)
 {
     ALOGV("AC3");
 
@@ -341,31 +353,10 @@ sp<MetaData> setAACFormat(AVCodecContext *avctx)
 {
     ALOGV("AAC");
 
-    uint32_t sr;
-    const uint8_t *header;
-    uint8_t profile, sf_index, channel;
-
-    header = avctx->extradata;
-    CHECK(header != NULL);
-
-    // AudioSpecificInfo follows
-    // oooo offf fccc c000
-    // o - audioObjectType
-    // f - samplingFreqIndex
-    // c - channelConfig
-    profile = ((header[0] & 0xf8) >> 3) - 1;
-    sf_index = (header[0] & 0x07) << 1 | (header[1] & 0x80) >> 7;
-    sr = getAACSampleRate(sf_index);
-    if (sr == 0) {
-        ALOGE("unsupport the aac sample rate");
-        return NULL;
-    }
-    channel = (header[1] >> 3) & 0xf;
-    ALOGV("aac profile: %d, sf_index: %d, channel: %d", profile, sf_index, channel);
-
-    sp<MetaData> meta = MakeAACCodecSpecificData(profile, sf_index, channel);
+    sp<MetaData> meta = new MetaData;
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
-
+    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta->setInt32(kKeyAACAOT, avctx->profile + 1);
     return meta;
 }
 
@@ -458,6 +449,22 @@ sp<MetaData> setFLACFormat(AVCodecContext *avctx)
     meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
     meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
+    if (avctx->extradata_size < 10) {
+        ALOGE("Invalid extradata in FLAC file! (size=%d)", avctx->extradata_size);
+        return meta;
+    }
+
+    ABitReader br(avctx->extradata, avctx->extradata_size);
+    int32_t minBlockSize = br.getBits(16);
+    int32_t maxBlockSize = br.getBits(16);
+    int32_t minFrameSize = br.getBits(24);
+    int32_t maxFrameSize = br.getBits(24);
+
+    meta->setInt32('mibs', minBlockSize);
+    meta->setInt32('mabs', maxBlockSize);
+    meta->setInt32('mifs', minFrameSize);
+    meta->setInt32('mafs', maxFrameSize);
+
     return meta;
 }
 
@@ -495,6 +502,92 @@ status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
     }
 
     return status;
+}
+
+int getDivXVersion(AVCodecContext *avctx)
+{
+    if (avctx->codec_tag == AV_RL32("DIV3")
+            || avctx->codec_tag == AV_RL32("div3")
+            || avctx->codec_tag == AV_RL32("DIV4")
+            || avctx->codec_tag == AV_RL32("div4")) {
+        return kTypeDivXVer_3_11;
+    }
+    if (avctx->codec_tag == AV_RL32("DIVX")
+            || avctx->codec_tag == AV_RL32("divx")) {
+        return kTypeDivXVer_4;
+    }
+    if (avctx->codec_tag == AV_RL32("DX50")
+           || avctx->codec_tag == AV_RL32("dx50")) {
+        return kTypeDivXVer_5;
+    }
+    return -1;
+}
+
+status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
+    if (meta == NULL || ctx == NULL) {
+        return NO_INIT;
+    }
+
+    AVDictionary *dict = ctx->metadata;
+    if (dict == NULL) {
+        return NO_INIT;
+    }
+
+    struct MetadataMapping {
+        const char *from;
+        int to;
+    };
+
+    // avformat -> android mapping
+    static const MetadataMapping kMap[] = {
+        { "track", kKeyCDTrackNumber },
+        { "disc", kKeyDiscNumber },
+        { "album", kKeyAlbum },
+        { "artist", kKeyArtist },
+        { "album_artist", kKeyAlbumArtist },
+        { "composer", kKeyComposer },
+        { "date", kKeyDate },
+        { "genre", kKeyGenre },
+        { "title", kKeyTitle },
+        { "year", kKeyYear },
+        { "compilation", kKeyCompilation },
+        { "location", kKeyLocation },
+    };
+
+    static const size_t kNumEntries = sizeof(kMap) / sizeof(kMap[0]);
+
+    for (size_t i = 0; i < kNumEntries; ++i) {
+        AVDictionaryEntry *entry = av_dict_get(dict, kMap[i].from, NULL, 0);
+        if (entry != NULL) {
+            ALOGV("found key %s with value %s", entry->key, entry->value);
+            meta->setCString(kMap[i].to, entry->value);
+        }
+    }
+
+    // now look for album art- this will be in a separate stream
+    for (size_t i = 0; i < ctx->nb_streams; i++) {
+        if (ctx->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
+            AVPacket pkt = ctx->streams[i]->attached_pic;
+            if (pkt.size > 0) {
+                if (ctx->streams[i]->codec != NULL) {
+                    const char *mime;
+                    if (ctx->streams[i]->codec->codec_id == AV_CODEC_ID_MJPEG) {
+                        mime = MEDIA_MIMETYPE_IMAGE_JPEG;
+                    } else if (ctx->streams[i]->codec->codec_id == AV_CODEC_ID_PNG) {
+                        mime = "image/png";
+                    } else {
+                        mime = NULL;
+                    }
+                    if (mime != NULL) {
+                        ALOGV("found albumart in stream %zu with type %s len %d", i, mime, pkt.size);
+                        meta->setData(kKeyAlbumArt, MetaData::TYPE_NONE, pkt.data, pkt.size);
+                        meta->setCString(kKeyAlbumArtMIME, mime);
+                    }
+                }
+            }
+        }
+    }
+    return OK;
 }
 
 }  // namespace android
