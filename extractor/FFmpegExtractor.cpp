@@ -328,6 +328,8 @@ bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
     case AV_CODEC_ID_WMV2:
     case AV_CODEC_ID_WMV3:
     case AV_CODEC_ID_VC1:
+    case AV_CODEC_ID_VP8:
+    case AV_CODEC_ID_VP9:
     case AV_CODEC_ID_WMAV1:
     case AV_CODEC_ID_WMAV2:
     case AV_CODEC_ID_WMAPRO:
