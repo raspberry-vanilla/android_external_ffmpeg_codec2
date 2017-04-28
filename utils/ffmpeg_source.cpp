@@ -22,16 +22,12 @@
 
 #include <media/stagefright/DataSource.h>
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 #include "config.h"
 #include "libavformat/url.h"
 
-#ifdef __cplusplus
 }
-#endif
 
 namespace android {
 

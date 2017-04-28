@@ -17,17 +17,13 @@
 #define LOG_TAG "codec_utils"
 #include <utils/Log.h>
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 #include "config.h"
 #include "libavcodec/xiph.h"
 #include "libavutil/intreadwrite.h"
 
-#ifdef __cplusplus
 }
-#endif
 
 #include <utils/Errors.h>
 #include <media/stagefright/foundation/ABitReader.h>

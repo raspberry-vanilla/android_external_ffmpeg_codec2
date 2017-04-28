@@ -26,9 +26,7 @@
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 #include "config.h"
 #include "libavformat/avformat.h"
@@ -58,9 +56,7 @@ extern "C" {
 
 #include <system/audio.h>
 
-#ifdef __cplusplus
 }
-#endif
 
 //XXX hack!!!
 #define SF_NOPTS_VALUE ((uint64_t)AV_NOPTS_VALUE-1)

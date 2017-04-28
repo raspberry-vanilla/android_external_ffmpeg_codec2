@@ -20,9 +20,7 @@
 
 #include <utils/Errors.h>
 
-#ifdef __cplusplus
 extern "C" {
-#endif
 
 #include "config.h"
 
@@ -36,9 +34,7 @@ extern "C" {
 #undef strncpy
 #include <string.h>
 
-#ifdef __cplusplus
 }
-#endif
 
 #include <cutils/properties.h>
 
