@@ -38,7 +38,7 @@ extern "C" {
 namespace android {
 
 static void EncodeSize14(uint8_t **_ptr, size_t size) {
-    CHECK_LE(size, 0x3fff);
+    CHECK_LE(size, 0x3fffu);
 
     uint8_t *ptr = *_ptr;
 
@@ -87,9 +87,8 @@ sp<MetaData> setAVCFormat(AVCodecContext *avctx)
 {
     ALOGV("AVC");
 
-    CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
     CHECK_GT(avctx->extradata_size, 0);
-    CHECK_EQ(avctx->extradata[0], 1); //configurationVersion
+    CHECK_EQ((int)avctx->extradata[0], 1); //configurationVersion
 
     if (avctx->width == 0 || avctx->height == 0) {
          int32_t width, height;
@@ -112,8 +111,7 @@ sp<MetaData> setH264Format(AVCodecContext *avctx)
 {
     ALOGV("H264");
 
-    CHECK_EQ(avctx->codec_id, AV_CODEC_ID_H264);
-    CHECK_NE(avctx->extradata[0], 1); //configurationVersion
+    CHECK_NE((int)avctx->extradata[0], 1); //configurationVersion
 
     sp<ABuffer> buffer = new ABuffer(avctx->extradata_size);
     memcpy(buffer->data(), avctx->extradata, avctx->extradata_size);

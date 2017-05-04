@@ -1129,7 +1129,7 @@ int32_t SoftFFmpegAudio::decodeAudio() {
     int len = 0;
     int gotFrm = false;
     int32_t ret = ERR_OK;
-    int32_t inputBufferUsedLength = 0;
+    uint32_t inputBufferUsedLength = 0;
     bool is_flush = (mEOSStatus == OUTPUT_FRAMES_FLUSHED);
     List<BufferInfo *> &inQueue = getPortQueue(kInputPortIndex);
     BufferInfo *inInfo = NULL;
@@ -1425,7 +1425,7 @@ void SoftFFmpegAudio::drainAllOutputBuffers() {
                 drainEOSOutputBuffer();
                 return;
             } else {
-                CHECK_EQ(err, ERR_OK);
+                CHECK_EQ(err, (int32_t)ERR_OK);
             }
         }
 
@@ -1494,7 +1494,7 @@ void SoftFFmpegAudio::onQueueFilled(OMX_U32 /* portIndex */) {
                 CHECK_EQ(mResampledDataSize, 0);
                 continue;
             } else {
-                CHECK_EQ(err, ERR_OK);
+                CHECK_EQ(err, (int32_t)ERR_OK);
             }
         }
 

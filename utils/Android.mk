@@ -14,7 +14,4 @@ LOCAL_MODULE := libffmpeg_utils
 # Clang when included from C++
 LOCAL_CLANG_CFLAGS += -DAVUTIL_ARM_INTREADWRITE_H
 
-# Quiet some noise from FFMPEG
-LOCAL_CLANG_CFLAGS += -Wno-unknown-attributes -Wno-deprecated-declarations
-
 include $(BUILD_SHARED_LIBRARY)

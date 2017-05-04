@@ -619,7 +619,7 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
         } else if (err == ERR_NO_FRM) {
             continue;
         } else {
-            CHECK_EQ(err, ERR_OK);
+            CHECK_EQ(err, (int32_t)ERR_OK);
         }
         if (drainOneOutputBuffer() != ERR_OK) {
             notify(OMX_EventError, OMX_ErrorUndefined, 0, NULL);
@@ -712,7 +712,7 @@ void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
         } else if (err == ERR_NO_FRM) {
             continue;
         } else {
-            CHECK_EQ(err, ERR_OK);
+            CHECK_EQ(err, (int32_t)ERR_OK);
         }
 
         if (handlePortSettingsChange()) {

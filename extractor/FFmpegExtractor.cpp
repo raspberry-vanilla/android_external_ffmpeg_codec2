@@ -366,7 +366,7 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
     sp<MetaData> meta = NULL;
 
     avctx = stream->codec;
-    CHECK_EQ(avctx->codec_type, AVMEDIA_TYPE_VIDEO);
+    CHECK_EQ((int)avctx->codec_type, (int)AVMEDIA_TYPE_VIDEO);
 
     switch(avctx->codec_id) {
     case AV_CODEC_ID_H264:
@@ -495,7 +495,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
     sp<MetaData> meta = NULL;
 
     avctx = stream->codec;
-    CHECK_EQ(avctx->codec_type, AVMEDIA_TYPE_AUDIO);
+    CHECK_EQ((int)avctx->codec_type, (int)AVMEDIA_TYPE_AUDIO);
 
     switch(avctx->codec_id) {
     case AV_CODEC_ID_MP2:
