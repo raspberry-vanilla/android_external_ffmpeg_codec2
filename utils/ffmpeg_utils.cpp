@@ -186,17 +186,10 @@ static int lockmgr(void **mtx, enum AVLockOp op)
 status_t initFFmpeg() 
 {
     status_t ret = OK;
-    bool debug_enabled = false;
-    char value[PROPERTY_VALUE_MAX];
 
     pthread_mutex_lock(&s_init_mutex);
 
-    if (property_get("debug.nam.ffmpeg", value, NULL)
-        && (!strcmp(value, "1") || !av_strcasecmp(value, "true"))) {
-        ALOGI("set ffmpeg debug level to AV_LOG_DEBUG");
-        debug_enabled = true;
-    }
-    if (debug_enabled)
+    if (property_get_bool("debug.nam.ffmpeg", 0))
         av_log_set_level(AV_LOG_DEBUG);
     else
         av_log_set_level(AV_LOG_INFO);
