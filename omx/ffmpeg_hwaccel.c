@@ -106,6 +106,7 @@ static enum AVPixelFormat get_format(AVCodecContext *s, const enum AVPixelFormat
         }
         ist->active_hwaccel_id = hwaccel->id;
         ist->hwaccel_pix_fmt = *p;
+        s->thread_count = 1;
 #ifdef LIBAV_CONFIG_H
         ist->dec = s->codec;
         ist->dec_ctx = avcodec_alloc_context3(ist->dec);
