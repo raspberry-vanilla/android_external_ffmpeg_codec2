@@ -17,9 +17,11 @@
 
 #define LOG_TAG "SoftFFmpegVideo"
 #include <utils/Log.h>
+#include <cutils/properties.h>
 
 #include "SoftFFmpegVideo.h"
 #include "FFmpegComponents.h"
+#include "ffmpeg_hwaccel.h"
 
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -122,10 +124,13 @@ status_t SoftFFmpegVideo::initDecoder(enum AVCodecID codecID) {
     mCtx->extradata = NULL;
     mCtx->width = mWidth;
     mCtx->height = mHeight;
+    ffmpeg_hwaccel_init(mCtx);
+    ALOGD("%p initDecoder: %p", this, mCtx);
     return OK;
 }
 
 void SoftFFmpegVideo::deInitDecoder() {
+    ALOGD("%p deInitDecoder: %p", this, mCtx);
     if (mCtx) {
         if (avcodec_is_open(mCtx)) {
             avcodec_flush_buffers(mCtx);
@@ -139,8 +144,8 @@ void SoftFFmpegVideo::deInitDecoder() {
             avcodec_close(mCtx);
             mCodecAlreadyOpened = false;
         }
-        av_free(mCtx);
-        mCtx = NULL;
+        ffmpeg_hwaccel_deinit(mCtx);
+        av_freep(&mCtx);
     }
     if (mFrame) {
         av_frame_free(&mFrame);
@@ -245,7 +250,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
             if (newWidth != oldWidth || newHeight != oldHeight) {
                 bool outputPort = (newParams->nPortIndex == kOutputPortIndex);
                 if (outputPort) {
-                    ALOGV("OMX_IndexParamPortDefinition (output) width=%d height=%d", newWidth, newHeight);
+                    ALOGI("OMX_IndexParamPortDefinition (output) width=%d height=%d", newWidth, newHeight);
 
                     // only update (essentially crop) if size changes
                     mWidth = newWidth;
@@ -258,7 +263,7 @@ OMX_ERRORTYPE SoftFFmpegVideo::internalSetParameter(
                     // For input port, we only set nFrameWidth and nFrameHeight. Buffer size
                     // is updated when configuring the output port using the max-frame-size,
                     // though client can still request a larger size.
-                    ALOGV("OMX_IndexParamPortDefinition (input) width=%d height=%d", newWidth, newHeight);
+                    ALOGI("OMX_IndexParamPortDefinition (input) width=%d height=%d", newWidth, newHeight);
                     def->format.video.nFrameWidth = newWidth;
                     def->format.video.nFrameHeight = newHeight;
                     mCtx->width = newWidth;
@@ -496,7 +501,14 @@ int32_t SoftFFmpegVideo::decodeVideo() {
                 ret = ERR_NO_FRM;
             }
         } else {
-            ret = ERR_OK;
+            err = ffmpeg_hwaccel_get_frame(mCtx, mFrame);
+            if (err < 0) {
+                ALOGE("ffmpeg HW video decoder failed to decode frame. (%d)", err);
+                //don't send error to OMXCodec, skip!
+                ret = ERR_NO_FRM;
+            } else {
+                ret = ERR_OK;
+            }
         }
     }
 
@@ -754,6 +766,9 @@ void SoftFFmpegVideo::onReset() {
 SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
+
+    if (!property_get_bool("media.sf.hwaccel", 1))
+        return NULL;
 
     OMX_VIDEO_CODINGTYPE codingType = OMX_VIDEO_CodingAutoDetect;
     char *componentRole = NULL;

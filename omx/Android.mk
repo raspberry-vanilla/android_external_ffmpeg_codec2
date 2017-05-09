@@ -5,7 +5,8 @@ include $(SF_COMMON_MK)
 LOCAL_SRC_FILES := \
 	FFmpegOMXPlugin.cpp \
 	SoftFFmpegAudio.cpp \
-	SoftFFmpegVideo.cpp
+	SoftFFmpegVideo.cpp \
+	ffmpeg_hwaccel.c \
 
 LOCAL_C_INCLUDES += \
 	$(TOP)/frameworks/native/include/media/hardware \
