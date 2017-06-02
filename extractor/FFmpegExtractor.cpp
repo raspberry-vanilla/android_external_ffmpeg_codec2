@@ -1715,6 +1715,7 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
     case AV_CODEC_ID_PCM_U8:
     case AV_CODEC_ID_PCM_S16LE:
     case AV_CODEC_ID_PCM_S24LE:
+    case AV_CODEC_ID_OPUS:
         supported = true;
         break;
 
@@ -1871,6 +1872,7 @@ static void adjustMKVConfidence(AVFormatContext *ic, float *confidence)
     if (codec_id != AV_CODEC_ID_NONE
             && codec_id != AV_CODEC_ID_AAC
             && codec_id != AV_CODEC_ID_MP3
+            && codec_id != AV_CODEC_ID_OPUS
             && codec_id != AV_CODEC_ID_VORBIS) {
         ALOGI("[mkv]audio codec(%s), confidence should be larger than MatroskaExtractor",
                 avcodec_get_name(codec_id));
