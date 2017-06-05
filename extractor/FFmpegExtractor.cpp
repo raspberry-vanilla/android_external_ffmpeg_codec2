@@ -2192,14 +2192,11 @@ bool SniffFFMPEG(
         ALOGV("sniff through BetterSniffFFMPEG success");
     }
 
-    if (mimeType != NULL && container != NULL && *mimeType == container) {
-        ALOGD("SniffFFMPEG sniffed the same thing as StageFright, use their extractor instead");
-        goto fail;
-    }
-
     if (container == NULL) {
         ALOGD("SniffFFMPEG failed to sniff this source");
-        goto fail;
+        (*meta)->clear();
+        *meta = NULL;
+        return false;
     }
 
     ALOGD("ffmpeg detected media content as '%s' with confidence %.2f",
@@ -2225,11 +2222,6 @@ bool SniffFFMPEG(
     }
 
     return true;
-
-fail:
-    (*meta)->clear();
-    *meta = NULL;
-    return false;
 }
 
 MediaExtractor *CreateFFMPEGExtractor(const sp<DataSource> &source, const char *mime, const sp<AMessage> &meta) {
