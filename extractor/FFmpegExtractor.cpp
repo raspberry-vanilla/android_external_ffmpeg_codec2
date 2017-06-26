@@ -348,7 +348,7 @@ bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
         supported = true;
         break;
     default:
-        ALOGD("unsuppoted codec(%s), but give it a chance",
+        ALOGD("unsupported codec (%s), but give it a chance",
                 avcodec_get_name(codec_id));
         //Won't promise that the following codec id can be supported.
         //Just give these codecs a chance.
@@ -421,7 +421,7 @@ sp<MetaData> FFmpegExtractor::setVideoFormat(AVStream *stream)
         meta = setVP9Format(avctx);
         break;
     default:
-        ALOGD("unsuppoted video codec(id:%d, name:%s), but give it a chance",
+        ALOGD("unsupported video codec (id: %d, name: %s), but give it a chance",
                 avctx->codec_id, avcodec_get_name(avctx->codec_id));
         meta = new MetaData;
         meta->setInt32(kKeyCodecId, avctx->codec_id);
@@ -540,7 +540,7 @@ sp<MetaData> FFmpegExtractor::setAudioFormat(AVStream *stream)
         meta = setALACFormat(avctx);
         break;
     default:
-        ALOGD("unsuppoted audio codec(id:%d, name:%s), but give it a chance",
+        ALOGD("unsupported audio codec (id: %d, name: %s), but give it a chance",
                 avctx->codec_id, avcodec_get_name(avctx->codec_id));
         meta = new MetaData;
         meta->setInt32(kKeyCodecId, avctx->codec_id);
@@ -1723,7 +1723,7 @@ static bool isCodecSupportedByStagefright(enum AVCodecID codec_id)
         break;
     }
 
-    ALOGD("%ssuppoted codec(%s) by official Stagefright",
+    ALOGD("%ssupported codec (%s) by official Stagefright",
             (supported ? "" : "un"),
             avcodec_get_name(codec_id));
 
