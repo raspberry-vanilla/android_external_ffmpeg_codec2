@@ -610,7 +610,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
         return ERR_SWS_FAILED;
     }
     sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
-            0, height, data, linesize);
+            0, mFrame->height, data, linesize);
 
     outHeader->nOffset = 0;
     outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * 3) / 2;
