@@ -589,21 +589,24 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     int64_t pts = AV_NOPTS_VALUE;
     uint8_t *dst = outHeader->pBuffer;
 
-    uint32_t width = outputBufferWidth();
-    uint32_t height = outputBufferHeight();
+    uint32_t bufferWidth = outputBufferWidth();
+    uint32_t bufferHeight = outputBufferHeight();
+    uint32_t frameWidth = mFrame->width;
+    uint32_t frameHeight = mFrame->height;
 
     data[0] = dst;
-    data[1] = dst + width * height;
-    data[2] = data[1] + (width / 2  * height / 2);
-    linesize[0] = width;
-    linesize[1] = width / 2;
-    linesize[2] = width / 2;
+    data[1] = dst + bufferWidth * bufferHeight;
+    data[2] = data[1] + (bufferWidth / 2  * bufferHeight / 2);
+    linesize[0] = bufferWidth;
+    linesize[1] = bufferWidth / 2;
+    linesize[2] = bufferWidth / 2;
 
-    ALOGV("drainOneOutputBuffer: frame_width=%d frame_height=%d width=%d height=%d ctx_width=%d ctx_height=%d", mFrame->width, mFrame->height, width, height, mCtx->width, mCtx->height);
+    ALOGD("drainOneOutputBuffer: frame_width=%d frame_height=%d buffer_width=%d buffer_height=%d ctx_width=%d ctx_height=%d mIsAdaptive=%d",
+          frameWidth, frameHeight, bufferWidth, bufferHeight, mCtx->width, mCtx->height, mIsAdaptive);
 
     int sws_flags = SWS_BICUBIC;
     mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
-           mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format, width, height,
+           mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format, mFrame->width, mFrame->height,
            AV_PIX_FMT_YUV420P, sws_flags, NULL, NULL, NULL);
     if (mImgConvertCtx == NULL) {
         ALOGE("Cannot initialize the conversion context");
@@ -613,7 +616,7 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
             0, mFrame->height, data, linesize);
 
     outHeader->nOffset = 0;
-    outHeader->nFilledLen = (outputBufferWidth() * outputBufferHeight() * 3) / 2;
+    outHeader->nFilledLen = (bufferWidth * bufferHeight * 3) / 2;
     outHeader->nFlags = 0;
     if (mFrame->key_frame) {
         outHeader->nFlags |= OMX_BUFFERFLAG_SYNCFRAME;
@@ -697,6 +700,7 @@ void SoftFFmpegVideo::drainAllOutputBuffers() {
 }
 
 bool SoftFFmpegVideo::handlePortSettingsChange() {
+#if 0
     CropSettingsMode crop = kCropUnSet;
     uint32_t width  = outputBufferWidth();
     uint32_t height = outputBufferHeight();
@@ -715,6 +719,12 @@ bool SoftFFmpegVideo::handlePortSettingsChange() {
     SoftVideoDecoderOMXComponent::handlePortSettingsChange(
             &portWillReset, mCtx->width, mCtx->height, crop);
     return portWillReset;
+#else
+    bool portWillReset = false;
+    SoftVideoDecoderOMXComponent::handlePortSettingsChange(
+            &portWillReset, mCtx->width, mCtx->height);
+    return portWillReset;
+#endif
 }
 
 void SoftFFmpegVideo::onQueueFilled(OMX_U32 portIndex __unused) {
