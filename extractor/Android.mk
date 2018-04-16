@@ -9,6 +9,7 @@ LOCAL_SHARED_LIBRARIES += \
 	libbinder         \
 	libmedia          \
 	libffmpeg_utils   \
+	liblog            \
 
 LOCAL_MODULE:= libffmpeg_extractor
 

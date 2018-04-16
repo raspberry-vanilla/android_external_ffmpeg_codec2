@@ -19,7 +19,7 @@
 
 #define SOFT_FFMPEGAUDIO_H_
 
-#include "SimpleSoftOMXComponent.h"
+#include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 
 #ifndef __GNUC__
 //fix DECLARE_ALIGNED

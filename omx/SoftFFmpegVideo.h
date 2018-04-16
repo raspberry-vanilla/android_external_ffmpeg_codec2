@@ -19,7 +19,7 @@
 
 #define SOFT_FFMPEGVIDEO_H_
 
-#include "SoftVideoDecoderOMXComponent.h"
+#include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
 
 #include "utils/ffmpeg_utils.h"
 

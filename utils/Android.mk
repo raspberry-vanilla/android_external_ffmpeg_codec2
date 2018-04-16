@@ -8,6 +8,10 @@ LOCAL_SRC_FILES := \
 	ffmpeg_cmdutils.c \
 	codec_utils.cpp
 
+LOCAL_SHARED_LIBRARIES += \
+	liblog            \
+	libmedia
+
 LOCAL_MODULE := libffmpeg_utils
 
 # Workaround for inline assembly tricks in FFMPEG which don't play nice with

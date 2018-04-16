@@ -588,7 +588,7 @@ void SoftFFmpegAudio::adjustAudioParams() {
 
 OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
         OMX_INDEXTYPE index, const OMX_PTR params) {
-    //ALOGV("internalSetParameter index:0x%x", index);
+    ALOGV("internalSetParameter index:0x%x", index);
     switch ((int)index) {
         case OMX_IndexParamStandardComponentRole:
         {

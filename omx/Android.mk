@@ -9,13 +9,14 @@ LOCAL_SRC_FILES := \
 	ffmpeg_hwaccel.c \
 
 LOCAL_C_INCLUDES += \
-	$(TOP)/frameworks/native/include/media/hardware \
-	$(TOP)/frameworks/av/media/libstagefright/include
+	$(TOP)/frameworks/native/include/media/hardware
 
 LOCAL_SHARED_LIBRARIES += \
 	libdl             \
 	libffmpeg_utils   \
 	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
+	liblog            \
+	libnativewindow   \
 	libswscale        \
 	libstagefright_omx
 

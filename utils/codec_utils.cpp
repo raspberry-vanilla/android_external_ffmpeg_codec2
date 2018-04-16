@@ -605,9 +605,6 @@ AudioEncoding sampleFormatToEncoding(AVSampleFormat fmt) {
         case AV_SAMPLE_FMT_S16:
         case AV_SAMPLE_FMT_S16P:
             return kAudioEncodingPcm16bit;
-        case AV_SAMPLE_FMT_S32:
-        case AV_SAMPLE_FMT_S32P:
-            return kAudioEncodingPcm32bit;
         case AV_SAMPLE_FMT_FLT:
         case AV_SAMPLE_FMT_FLTP:
             return kAudioEncodingPcmFloat;
@@ -626,9 +623,6 @@ AVSampleFormat encodingToSampleFormat(AudioEncoding encoding) {
             return AV_SAMPLE_FMT_U8;
         case kAudioEncodingPcm16bit:
             return AV_SAMPLE_FMT_S16;
-        case kAudioEncodingPcm24bitPacked:
-        case kAudioEncodingPcm32bit:
-            return AV_SAMPLE_FMT_S32;
         case kAudioEncodingPcmFloat:
             return AV_SAMPLE_FMT_FLT;
         default:
