@@ -162,8 +162,10 @@ int ffmpeg_hwaccel_init(AVCodecContext *avctx)
 void ffmpeg_hwaccel_deinit(AVCodecContext *avctx)
 {
     if (avctx->opaque) {
-#ifdef LIBAV_CONFIG_H
         InputStream *ist = avctx->opaque;
+        if (ist->hwaccel_uninit)
+            ist->hwaccel_uninit(avctx);
+#ifdef LIBAV_CONFIG_H
         avcodec_free_context(&ist->dec_ctx);
 #endif
         av_freep(&avctx->opaque);
