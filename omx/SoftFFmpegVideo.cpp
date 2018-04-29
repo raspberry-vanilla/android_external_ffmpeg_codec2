@@ -836,12 +836,12 @@ SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
         return NULL;
 
     OMX_VIDEO_CODINGTYPE codingType = OMX_VIDEO_CodingAutoDetect;
-    char *componentRole = NULL;
+    const char *componentRole = NULL;
     enum AVCodecID codecID = AV_CODEC_ID_NONE;
 
     for (size_t i = 0; i < kNumVideoComponents; ++i) {
         if (!strcasecmp(name, kVideoComponents[i].mName)) {
-            componentRole = strdup(kVideoComponents[i].mRole);
+            componentRole = kVideoComponents[i].mRole;
             codingType = kVideoComponents[i].mVideoCodingType;
             codecID = kVideoComponents[i].mCodecID;
             break;

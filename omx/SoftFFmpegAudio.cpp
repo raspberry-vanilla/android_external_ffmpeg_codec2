@@ -1576,12 +1576,12 @@ SoftOMXComponent* SoftFFmpegAudio::createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
     OMX_AUDIO_CODINGTYPE codingType = OMX_AUDIO_CodingAutoDetect;
-    char *componentRole = NULL;
+    const char *componentRole = NULL;
     enum AVCodecID codecID = AV_CODEC_ID_NONE;
 
     for (size_t i = 0; i < kNumAudioComponents; ++i) {
         if (!strcasecmp(name, kAudioComponents[i].mName)) {
-            componentRole = strdup(kAudioComponents[i].mRole);
+            componentRole = kAudioComponents[i].mRole;
             codingType = kAudioComponents[i].mAudioCodingType;
             codecID = kAudioComponents[i].mCodecID;
             break;
