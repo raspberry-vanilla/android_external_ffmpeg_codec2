@@ -18,11 +18,11 @@
 
 #define SUPER_EXTRACTOR_H_
 
+#include <media/MediaExtractor.h>
+#include <media/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaExtractor.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
-#include <media/stagefright/MediaSource.h>
 
 #include "utils/ffmpeg_utils.h"
 
@@ -34,13 +34,13 @@ class String8;
 struct FFmpegSource;
 
 struct FFmpegExtractor : public MediaExtractor {
-    FFmpegExtractor(const sp<DataSource> &source, const sp<AMessage> &meta);
+    FFmpegExtractor(DataSourceBase *source, const sp<AMessage> &meta);
 
     virtual size_t countTracks();
-    virtual sp<IMediaSource> getTrack(size_t index);
-    virtual sp<MetaData> getTrackMetaData(size_t index, uint32_t flags);
+    virtual MediaTrack* getTrack(size_t index);
+    virtual status_t getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t flags);
 
-    virtual sp<MetaData> getMetaData();
+    virtual status_t getMetaData(MetaDataBase &meta);
 
     virtual uint32_t flags() const;
 
@@ -52,7 +52,7 @@ private:
 
     struct TrackInfo {
         int mIndex; //stream index
-        sp<MetaData> mMeta;
+        MetaDataBase mMeta;
         AVStream *mStream;
         PacketQueue *mQueue;
     };
@@ -63,8 +63,8 @@ private:
     mutable Mutex mExtractorMutex;
     Condition mCondition;
 
-    sp<DataSource> mDataSource;
-    sp<MetaData> mMeta;
+    DataSourceBase *mDataSource;
+    MetaDataBase mMeta;
     status_t mInitCheck;
 
     char mFilename[PATH_MAX];
@@ -112,9 +112,9 @@ private:
     void setFFmpegDefaultOpts();
     void printTime(int64_t time);
     bool is_codec_supported(enum AVCodecID codec_id);
-    sp<MetaData> setVideoFormat(AVStream *stream);
-    sp<MetaData> setAudioFormat(AVStream *stream);
-    void setDurationMetaData(AVStream *stream, sp<MetaData> &meta);
+    status_t setVideoFormat(AVStream *stream, MetaDataBase &meta);
+    status_t setAudioFormat(AVStream *stream, MetaDataBase &meta);
+    void setDurationMetaData(AVStream *stream, MetaDataBase &meta);
     int stream_component_open(int stream_index);
     void stream_component_close(int stream_index);
     void reachedEOS(enum AVMediaType media_type);
@@ -134,6 +134,7 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
 };
 
+/*
 extern "C" {
 
 static const char *findMatchingContainer(const char *name);
@@ -146,6 +147,7 @@ MediaExtractor* CreateFFMPEGExtractor(const sp<DataSource> &source,
         const char *mime, const sp<AMessage> &meta);
 
 }
+*/
 
 }  // namespace android
 

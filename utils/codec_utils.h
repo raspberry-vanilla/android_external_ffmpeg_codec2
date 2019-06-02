@@ -29,37 +29,37 @@
 namespace android {
 
 //video
-sp<MetaData> setAVCFormat(AVCodecContext *avctx);
-sp<MetaData> setH264Format(AVCodecContext *avctx);
-sp<MetaData> setMPEG4Format(AVCodecContext *avctx);
-sp<MetaData> setH263Format(AVCodecContext *avctx);
-sp<MetaData> setMPEG2VIDEOFormat(AVCodecContext *avctx);
-sp<MetaData> setVC1Format(AVCodecContext *avctx);
-sp<MetaData> setWMV1Format(AVCodecContext *avctx);
-sp<MetaData> setWMV2Format(AVCodecContext *avctx);
-sp<MetaData> setWMV3Format(AVCodecContext *avctx);
-sp<MetaData> setRV20Format(AVCodecContext *avctx);
-sp<MetaData> setRV30Format(AVCodecContext *avctx);
-sp<MetaData> setRV40Format(AVCodecContext *avctx);
-sp<MetaData> setFLV1Format(AVCodecContext *avctx);
-sp<MetaData> setHEVCFormat(AVCodecContext *avctx);
-sp<MetaData> setVP8Format(AVCodecContext *avctx);
-sp<MetaData> setVP9Format(AVCodecContext *avctx);
+status_t setAVCFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setH264Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setMPEG4Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setH263Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setMPEG2VIDEOFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setVC1Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMV1Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMV2Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMV3Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setRV20Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setRV30Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setRV40Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setFLV1Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setHEVCFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setVP8Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setVP9Format(AVCodecContext *avctx, MetaDataBase &meta);
 //audio
-sp<MetaData> setMP2Format(AVCodecContext *avctx);
-sp<MetaData> setMP3Format(AVCodecContext *avctx);
-sp<MetaData> setVORBISFormat(AVCodecContext *avctx);
-sp<MetaData> setAC3Format(AVCodecContext *avctx);
-sp<MetaData> setAACFormat(AVCodecContext *avctx);
-sp<MetaData> setWMAV1Format(AVCodecContext *avctx);
-sp<MetaData> setWMAV2Format(AVCodecContext *avctx);
-sp<MetaData> setWMAProFormat(AVCodecContext *avctx);
-sp<MetaData> setWMALossLessFormat(AVCodecContext *avctx);
-sp<MetaData> setRAFormat(AVCodecContext *avctx);
-sp<MetaData> setAPEFormat(AVCodecContext *avctx);
-sp<MetaData> setDTSFormat(AVCodecContext *avctx);
-sp<MetaData> setFLACFormat(AVCodecContext *avctx);
-sp<MetaData> setALACFormat(AVCodecContext *avctx);
+status_t setMP2Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setMP3Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setVORBISFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setAC3Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setAACFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMAV1Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMAV2Format(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMAProFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setWMALossLessFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setRAFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setAPEFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setDTSFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setFLACFormat(AVCodecContext *avctx, MetaDataBase &meta);
+status_t setALACFormat(AVCodecContext *avctx, MetaDataBase &meta);
 
 //Convert H.264 NAL format to annex b
 status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
@@ -67,7 +67,7 @@ status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
 
 int getDivXVersion(AVCodecContext *avctx);
 
-status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta);
+status_t parseMetadataTags(AVFormatContext *ctx, MetaDataBase &meta);
 
 AudioEncoding sampleFormatToEncoding(AVSampleFormat fmt);
 AVSampleFormat encodingToSampleFormat(AudioEncoding encoding);

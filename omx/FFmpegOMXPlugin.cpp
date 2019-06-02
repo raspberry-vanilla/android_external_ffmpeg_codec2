@@ -85,8 +85,6 @@ OMX_ERRORTYPE FFmpegOMXPlugin::destroyComponentInstance(
 
     me->prepareForDestruction();
 
-    void *libHandle = me->libHandle();
-
     CHECK_EQ(me->getStrongCount(), 1);
     me->decStrong(this);
     me = NULL;

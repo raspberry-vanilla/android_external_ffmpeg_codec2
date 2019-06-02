@@ -28,10 +28,11 @@ extern "C" {
 #include <utils/Errors.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>
-#include "include/avc_utils.h"
+#include <media/stagefright/MetaDataUtils.h>
 
 #include "codec_utils.h"
 
@@ -83,7 +84,7 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
 //http://msdn.microsoft.com/en-us/library/dd757808(v=vs.85).aspx
 
 // H.264 bitstream without start codes.
-sp<MetaData> setAVCFormat(AVCodecContext *avctx)
+status_t setAVCFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("AVC");
 
@@ -99,26 +100,26 @@ sp<MetaData> setAVCFormat(AVCodecContext *avctx)
          avctx->height = height;
      }
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
-    meta->setData(kKeyAVCC, kTypeAVCC, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_AVC);
+    meta.setData(kKeyAVCC, kTypeAVCC, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
 // H.264 bitstream with start codes.
-sp<MetaData> setH264Format(AVCodecContext *avctx)
+status_t setH264Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("H264");
 
     CHECK_NE((int)avctx->extradata[0], 1); //configurationVersion
 
-    sp<ABuffer> buffer = new ABuffer(avctx->extradata_size);
-    memcpy(buffer->data(), avctx->extradata, avctx->extradata_size);
-    return MakeAVCCodecSpecificData(buffer);
+    if (!MakeAVCCodecSpecificData(meta, avctx->extradata, avctx->extradata_size))
+      return UNKNOWN_ERROR;
+
+    return OK;
 }
 
-sp<MetaData> setMPEG4Format(AVCodecContext *avctx)
+status_t setMPEG4Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("MPEG4");
 
@@ -126,30 +127,28 @@ sp<MetaData> setMPEG4Format(AVCodecContext *avctx)
     memcpy(csd->data(), avctx->extradata, avctx->extradata_size);
     sp<ABuffer> esds = MakeMPEGVideoESDS(csd);
 
-    sp<MetaData> meta = new MetaData;
-    meta->setData(kKeyESDS, kTypeESDS, esds->data(), esds->size());
+    meta.setData(kKeyESDS, kTypeESDS, esds->data(), esds->size());
 
     int divxVersion = getDivXVersion(avctx);
     if (divxVersion >= 0) {
-        meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_DIVX);
-        meta->setInt32(kKeyDivXVersion, divxVersion);
+        meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_DIVX);
+        meta.setInt32(kKeyDivXVersion, divxVersion);
     } else {
-        meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
+        meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG4);
     }
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setH263Format(AVCodecContext *avctx __unused)
+status_t setH263Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("H263");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_H263);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_H263);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setMPEG2VIDEOFormat(AVCodecContext *avctx)
+status_t setMPEG2VIDEOFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("MPEG%uVIDEO", avctx->codec_id == AV_CODEC_ID_MPEG2VIDEO ? 2 : 1);
 
@@ -157,160 +156,146 @@ sp<MetaData> setMPEG2VIDEOFormat(AVCodecContext *avctx)
     memcpy(csd->data(), avctx->extradata, avctx->extradata_size);
     sp<ABuffer> esds = MakeMPEGVideoESDS(csd);
 
-    sp<MetaData> meta = new MetaData;
-    meta->setData(kKeyESDS, kTypeESDS, esds->data(), esds->size());
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
+    meta.setData(kKeyESDS, kTypeESDS, esds->data(), esds->size());
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_MPEG2);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setVC1Format(AVCodecContext *avctx)
+status_t setVC1Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("VC1");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VC1);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VC1);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setWMV1Format(AVCodecContext *avctx __unused)
+status_t setWMV1Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("WMV1");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_WMV);
-    meta->setInt32(kKeyWMVVersion, kTypeWMVVer_7);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_WMV);
+    meta.setInt32(kKeyWMVVersion, kTypeWMVVer_7);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setWMV2Format(AVCodecContext *avctx)
+status_t setWMV2Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("WMV2");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_WMV);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyWMVVersion, kTypeWMVVer_8);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_WMV);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyWMVVersion, kTypeWMVVer_8);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setWMV3Format(AVCodecContext *avctx)
+status_t setWMV3Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("WMV3");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_WMV);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyWMVVersion, kTypeWMVVer_9);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_WMV);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyWMVVersion, kTypeWMVVer_9);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setRV20Format(AVCodecContext *avctx)
+status_t setRV20Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("RV20");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_RV);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyRVVersion, kTypeRVVer_G2); //http://en.wikipedia.org/wiki/RealVide
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_RV);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyRVVersion, kTypeRVVer_G2); //http://en.wikipedia.org/wiki/RealVide
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setRV30Format(AVCodecContext *avctx)
+status_t setRV30Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("RV30");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_RV);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyRVVersion, kTypeRVVer_8); //http://en.wikipedia.org/wiki/RealVide
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_RV);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyRVVersion, kTypeRVVer_8); //http://en.wikipedia.org/wiki/RealVide
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setRV40Format(AVCodecContext *avctx)
+status_t setRV40Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("RV40");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_RV);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyRVVersion, kTypeRVVer_9); //http://en.wikipedia.org/wiki/RealVide
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_RV);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyRVVersion, kTypeRVVer_9); //http://en.wikipedia.org/wiki/RealVide
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setFLV1Format(AVCodecContext *avctx)
+status_t setFLV1Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("FLV1(Sorenson H263)");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_FLV1);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_FLV1);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setHEVCFormat(AVCodecContext *avctx)
+status_t setHEVCFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("HEVC");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
-    meta->setData(kKeyHVCC, kTypeHVCC, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_HEVC);
+    meta.setData(kKeyHVCC, kTypeHVCC, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setVP8Format(AVCodecContext *avctx __unused)
+status_t setVP8Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("VP8");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP8);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setVP9Format(AVCodecContext *avctx __unused)
+status_t setVP9Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("VP9");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_VIDEO_VP9);
 
-    return meta;
+    return OK;
 }
 
 //audio
 
-sp<MetaData> setMP2Format(AVCodecContext *avctx __unused)
+status_t setMP2Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("MP2");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setMP3Format(AVCodecContext *avctx __unused)
+status_t setMP3Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("MP3");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_MPEG);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setVORBISFormat(AVCodecContext *avctx)
+status_t setVORBISFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("VORBIS");
 
@@ -320,143 +305,132 @@ sp<MetaData> setVORBISFormat(AVCodecContext *avctx)
                 avctx->extradata_size, 30,
                 header_start, header_len) < 0) {
         ALOGE("vorbis extradata corrupt.");
-        return NULL;
+        return UNKNOWN_ERROR;
     }
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_VORBIS);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_VORBIS);
     //identification header
-    meta->setData(kKeyVorbisInfo,  0, header_start[0], header_len[0]);
+    meta.setData(kKeyVorbisInfo,  0, header_start[0], header_len[0]);
     //setup header
-    meta->setData(kKeyVorbisBooks, 0, header_start[2], header_len[2]);
+    meta.setData(kKeyVorbisBooks, 0, header_start[2], header_len[2]);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setAC3Format(AVCodecContext *avctx __unused)
+status_t setAC3Format(AVCodecContext *avctx __unused, MetaDataBase &meta)
 {
     ALOGV("AC3");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC3);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AC3);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setAACFormat(AVCodecContext *avctx)
+status_t setAACFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("AAC");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyAACAOT, avctx->profile + 1);
-    return meta;
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_AAC);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyAACAOT, avctx->profile + 1);
+
+    return OK;
 }
 
-sp<MetaData> setWMAV1Format(AVCodecContext *avctx)
+status_t setWMAV1Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("WMAV1");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyWMAVersion, kTypeWMA); //FIXME version?
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyWMAVersion, kTypeWMA); //FIXME version?
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setWMAV2Format(AVCodecContext *avctx)
+status_t setWMAV2Format(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("WMAV2");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyWMAVersion, kTypeWMA);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyWMAVersion, kTypeWMA);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setWMAProFormat(AVCodecContext *avctx)
+status_t setWMAProFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("WMAPro");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyWMAVersion, kTypeWMAPro);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyWMAVersion, kTypeWMAPro);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setWMALossLessFormat(AVCodecContext *avctx)
+status_t setWMALossLessFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("WMALOSSLESS");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
-    meta->setInt32(kKeyWMAVersion, kTypeWMALossLess);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_WMA);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setInt32(kKeyWMAVersion, kTypeWMALossLess);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setRAFormat(AVCodecContext *avctx)
+status_t setRAFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("COOK");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RA);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_RA);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setALACFormat(AVCodecContext *avctx)
+status_t setALACFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("ALAC");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_ALAC);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_ALAC);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setAPEFormat(AVCodecContext *avctx)
+status_t setAPEFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("APE");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_APE);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_APE);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setDTSFormat(AVCodecContext *avctx)
+status_t setDTSFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("DTS");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_DTS);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_DTS);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
-    return meta;
+    return OK;
 }
 
-sp<MetaData> setFLACFormat(AVCodecContext *avctx)
+status_t setFLACFormat(AVCodecContext *avctx, MetaDataBase &meta)
 {
     ALOGV("FLAC");
 
-    sp<MetaData> meta = new MetaData;
-    meta->setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
-    meta->setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
+    meta.setCString(kKeyMIMEType, MEDIA_MIMETYPE_AUDIO_FLAC);
+    meta.setData(kKeyRawCodecSpecificData, 0, avctx->extradata, avctx->extradata_size);
 
     if (avctx->extradata_size < 10) {
         ALOGE("Invalid extradata in FLAC file! (size=%d)", avctx->extradata_size);
-        return meta;
+        return UNKNOWN_ERROR;
     }
 
     ABitReader br(avctx->extradata, avctx->extradata_size);
@@ -465,12 +439,12 @@ sp<MetaData> setFLACFormat(AVCodecContext *avctx)
     int32_t minFrameSize = br.getBits(24);
     int32_t maxFrameSize = br.getBits(24);
 
-    meta->setInt32('mibs', minBlockSize);
-    meta->setInt32('mabs', maxBlockSize);
-    meta->setInt32('mifs', minFrameSize);
-    meta->setInt32('mafs', maxFrameSize);
+    meta.setInt32('mibs', minBlockSize);
+    meta.setInt32('mabs', maxBlockSize);
+    meta.setInt32('mifs', minFrameSize);
+    meta.setInt32('mafs', maxFrameSize);
 
-    return meta;
+    return OK;
 }
 
 //Convert H.264 NAL format to annex b
@@ -528,8 +502,8 @@ int getDivXVersion(AVCodecContext *avctx)
     return -1;
 }
 
-status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
-    if (meta == NULL || ctx == NULL) {
+status_t parseMetadataTags(AVFormatContext *ctx, MetaDataBase &meta) {
+    if (ctx == NULL) {
         return NO_INIT;
     }
 
@@ -565,7 +539,7 @@ status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
         AVDictionaryEntry *entry = av_dict_get(dict, kMap[i].from, NULL, 0);
         if (entry != NULL) {
             ALOGV("found key %s with value %s", entry->key, entry->value);
-            meta->setCString(kMap[i].to, entry->value);
+            meta.setCString(kMap[i].to, entry->value);
         }
     }
 
@@ -585,8 +559,8 @@ status_t parseMetadataTags(AVFormatContext *ctx, const sp<MetaData> &meta) {
                     }
                     if (mime != NULL) {
                         ALOGV("found albumart in stream %zu with type %s len %d", i, mime, pkt.size);
-                        meta->setData(kKeyAlbumArt, MetaData::TYPE_NONE, pkt.data, pkt.size);
-                        meta->setCString(kKeyAlbumArtMIME, mime);
+                        meta.setData(kKeyAlbumArt, MetaData::TYPE_NONE, pkt.data, pkt.size);
+                        meta.setCString(kKeyAlbumArtMIME, mime);
                     }
                 }
             }

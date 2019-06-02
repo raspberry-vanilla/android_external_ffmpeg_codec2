@@ -44,10 +44,6 @@ extern "C" {
 // log
 static int flags;
 
-// dummy
-const char program_name[] = "dummy";
-const int program_birth_year = 2012;
-
 // init ffmpeg
 static pthread_mutex_t s_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int s_ref_count = 0;
@@ -72,7 +68,6 @@ void nam_av_log_callback(void* ptr, int level, const char* fmt, va_list vl)
     static int count;
     static char prev[1024];
     char line[1024];
-    static int is_atty;
 
     if (level > av_log_get_level())
         return;

@@ -10,7 +10,10 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES += \
 	liblog            \
-	libmedia
+	libmediaextractor \
+	libstagefright
+
+LOCAL_STATIC_LIBRARIES += libstagefright_metadatautils
 
 LOCAL_MODULE := libffmpeg_utils
 

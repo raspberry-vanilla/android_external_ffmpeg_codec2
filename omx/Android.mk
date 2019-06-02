@@ -14,6 +14,7 @@ LOCAL_C_INCLUDES += \
 LOCAL_SHARED_LIBRARIES += \
 	libdl             \
 	libffmpeg_utils   \
+	android.hidl.memory@1.0	\
 	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
 	liblog            \
 	libnativewindow   \

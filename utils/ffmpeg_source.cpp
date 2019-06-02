@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include "ffmpeg_source.h"
 
-#include <media/stagefright/DataSource.h>
+#include <media/DataSourceBase.h>
 
 extern "C" {
 
@@ -34,14 +34,14 @@ namespace android {
 class FFSource
 {
 public:
-    void set(DataSource *s) { mSource = s; }
+    void set(DataSourceBase *s) { mSource = s; }
     int init_check();
     int read(unsigned char *buf, size_t size);
     int64_t seek(int64_t pos);
     off64_t getSize();
 
 protected:
-    sp<DataSource> mSource;
+    DataSourceBase *mSource;
     int64_t mOffset;
 };
 
@@ -93,9 +93,9 @@ off64_t FFSource::getSize()
 
 static int android_open(URLContext *h, const char *url, int flags __unused)
 {
-    // the url in form of "android-source:<DataSource Ptr>",
-    // the DataSource Pointer passed by the ffmpeg extractor
-    DataSource *source = NULL;
+    // the url in form of "android-source:<DataSourceBase Ptr>",
+    // the DataSourceBase Pointer passed by the ffmpeg extractor
+    DataSourceBase *source = NULL;
     char url_check[PATH_MAX] = {0};
 
     ALOGV("android source begin open");
@@ -117,14 +117,14 @@ static int android_open(URLContext *h, const char *url, int flags __unused)
 
     if (strcmp(url_check, url) != 0) {
 
-        String8 uri = source->getUri();
-        if (!uri.string()) {
+        char uri[PATH_MAX] = {0};
+        if (!source->getUri(uri, sizeof(uri))) {
             ALOGE("ffmpeg open data source error! (source uri)");
             return -1;
         }
 
         snprintf(url_check, sizeof(url_check), "android-source:%p|file:%s",
-                    source, uri.string());
+                    source, uri);
 
         if (strcmp(url_check, url) != 0) {
             ALOGE("ffmpeg open data source error! (url check)");
