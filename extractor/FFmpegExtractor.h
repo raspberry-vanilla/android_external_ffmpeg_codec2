@@ -18,8 +18,9 @@
 
 #define SUPER_EXTRACTOR_H_
 
-#include <media/MediaExtractor.h>
-#include <media/MediaSource.h>
+#include <media/MediaExtractorPluginApi.h>
+#include <media/MediaExtractorPluginHelper.h>
+#include <media/NdkMediaFormat.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
@@ -33,16 +34,17 @@ struct AMessage;
 class String8;
 struct FFmpegSource;
 
-struct FFmpegExtractor : public MediaExtractor {
-    FFmpegExtractor(DataSourceBase *source, const sp<AMessage> &meta);
+struct FFmpegExtractor : public MediaExtractorPluginHelper {
+    FFmpegExtractor(DataSourceHelper *source, const sp<AMessage> &meta);
 
     virtual size_t countTracks();
-    virtual MediaTrack* getTrack(size_t index);
-    virtual status_t getTrackMetaData(MetaDataBase &meta, size_t index, uint32_t flags);
+    virtual MediaTrackHelper* getTrack(size_t index);
+    virtual media_status_t getTrackMetaData(AMediaFormat *meta, size_t index, uint32_t flags);
 
-    virtual status_t getMetaData(MetaDataBase &meta);
+    virtual media_status_t getMetaData(AMediaFormat *meta);
 
     virtual uint32_t flags() const;
+    virtual const char* name() { return "FFmpegExtractor"; }
 
 protected:
     virtual ~FFmpegExtractor();
@@ -52,7 +54,7 @@ private:
 
     struct TrackInfo {
         int mIndex; //stream index
-        MetaDataBase mMeta;
+        AMediaFormat *mMeta;
         AVStream *mStream;
         PacketQueue *mQueue;
     };
@@ -63,8 +65,8 @@ private:
     mutable Mutex mExtractorMutex;
     Condition mCondition;
 
-    DataSourceBase *mDataSource;
-    MetaDataBase mMeta;
+    DataSourceHelper *mDataSource;
+    AMediaFormat *mMeta;
     status_t mInitCheck;
 
     char mFilename[PATH_MAX];
@@ -84,7 +86,7 @@ private:
     int mPaused;
     int mLastPaused;
     int mSeekIdx;
-    MediaSource::ReadOptions::SeekMode mSeekMode;
+    MediaTrackHelper::ReadOptions::SeekMode mSeekMode;
     int64_t mSeekPos;
     int64_t mSeekMin;
     int64_t mSeekMax;
@@ -112,14 +114,14 @@ private:
     void setFFmpegDefaultOpts();
     void printTime(int64_t time);
     bool is_codec_supported(enum AVCodecID codec_id);
-    status_t setVideoFormat(AVStream *stream, MetaDataBase &meta);
-    status_t setAudioFormat(AVStream *stream, MetaDataBase &meta);
-    void setDurationMetaData(AVStream *stream, MetaDataBase &meta);
+    media_status_t setVideoFormat(AVStream *stream, AMediaFormat *meta);
+    media_status_t setAudioFormat(AVStream *stream, AMediaFormat *meta);
+    void setDurationMetaData(AVStream *stream, AMediaFormat *meta);
     int stream_component_open(int stream_index);
     void stream_component_close(int stream_index);
     void reachedEOS(enum AVMediaType media_type);
     int stream_seek(int64_t pos, enum AVMediaType media_type,
-            MediaSource::ReadOptions::SeekMode mode);
+            MediaTrackHelper::ReadOptions::SeekMode mode);
     int check_extradata(AVCodecContext *avctx);
 
     bool mReaderThreadStarted;
@@ -133,21 +135,6 @@ private:
 
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
 };
-
-/*
-extern "C" {
-
-static const char *findMatchingContainer(const char *name);
-
-bool SniffFFMPEG(
-        const sp<DataSource> &source, String8 *mimeType, float *confidence,
-        sp<AMessage> *);
-
-MediaExtractor* CreateFFMPEGExtractor(const sp<DataSource> &source,
-        const char *mime, const sp<AMessage> &meta);
-
-}
-*/
 
 }  // namespace android
 

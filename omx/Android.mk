@@ -19,7 +19,7 @@ LOCAL_SHARED_LIBRARIES += \
 	liblog            \
 	libnativewindow   \
 	libswscale        \
-	libstagefright_omx
+	libstagefright_softomx
 
 LOCAL_MODULE:= libffmpeg_omx
 

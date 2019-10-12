@@ -7,9 +7,9 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES += \
 	libbinder         \
-	libmediaextractor \
 	libffmpeg_utils   \
-	liblog            \
+	libmediandk       \
+	liblog
 
 LOCAL_MODULE:= libffmpeg_extractor
 LOCAL_MODULE_RELATIVE_PATH := extractors

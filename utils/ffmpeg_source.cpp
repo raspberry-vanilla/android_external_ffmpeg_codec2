@@ -20,7 +20,7 @@
 #include <stdlib.h>
 #include "ffmpeg_source.h"
 
-#include <media/DataSourceBase.h>
+#include <media/MediaExtractorPluginApi.h>
 
 extern "C" {
 
@@ -34,24 +34,19 @@ namespace android {
 class FFSource
 {
 public:
-    void set(DataSourceBase *s) { mSource = s; }
+    void set(CDataSource *s) { mSource = s; }
     int init_check();
     int read(unsigned char *buf, size_t size);
     int64_t seek(int64_t pos);
     off64_t getSize();
 
 protected:
-    DataSourceBase *mSource;
+    CDataSource *mSource;
     int64_t mOffset;
 };
 
 int FFSource::init_check()
 {
-    if (mSource->initCheck() != OK) {
-        ALOGE("FFSource initCheck failed");
-        return -1;
-    }
-
     return 0;
 }
 
@@ -59,7 +54,7 @@ int FFSource::read(unsigned char *buf, size_t size)
 {
     ssize_t n = 0;
 
-    n = mSource->readAt(mOffset, buf, size);
+    n = mSource->readAt(mSource->handle, mOffset, buf, size);
     if (n == UNKNOWN_ERROR) {
         ALOGE("FFSource readAt failed");
         return AVERROR(errno);
@@ -81,7 +76,7 @@ off64_t FFSource::getSize()
 {
     off64_t sz = -1;
 
-    if (mSource->getSize(&sz) != OK) {
+    if (mSource->getSize(mSource->handle, &sz) != OK) {
          ALOGE("FFSource getSize failed");
          return AVERROR(errno);
     }
@@ -93,9 +88,9 @@ off64_t FFSource::getSize()
 
 static int android_open(URLContext *h, const char *url, int flags __unused)
 {
-    // the url in form of "android-source:<DataSourceBase Ptr>",
+    // the url in form of "android-source:<CDataSource Ptr>",
     // the DataSourceBase Pointer passed by the ffmpeg extractor
-    DataSourceBase *source = NULL;
+    CDataSource *source = NULL;
     char url_check[PATH_MAX] = {0};
 
     ALOGV("android source begin open");
@@ -118,7 +113,7 @@ static int android_open(URLContext *h, const char *url, int flags __unused)
     if (strcmp(url_check, url) != 0) {
 
         char uri[PATH_MAX] = {0};
-        if (!source->getUri(uri, sizeof(uri))) {
+        if (!source->getUri(source->handle, uri, sizeof(uri))) {
             ALOGE("ffmpeg open data source error! (source uri)");
             return -1;
         }

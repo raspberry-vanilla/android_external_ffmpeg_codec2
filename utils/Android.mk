@@ -10,8 +10,7 @@ LOCAL_SRC_FILES := \
 
 LOCAL_SHARED_LIBRARIES += \
 	liblog            \
-	libmediaextractor \
-	libstagefright
+	libmediandk
 
 LOCAL_STATIC_LIBRARIES += libstagefright_metadatautils
 
