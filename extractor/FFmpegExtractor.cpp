@@ -26,7 +26,7 @@
 #include <utils/misc.h>
 #include <utils/String8.h>
 #include <cutils/properties.h>
-#include <media/DataSourceBase.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/stagefright/foundation/ABitReader.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
