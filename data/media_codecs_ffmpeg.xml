@@ -96,12 +96,12 @@
             <Feature name="adaptive-playback" />
         </MediaCodec>
         <MediaCodec name="OMX.ffmpeg.h264.decoder"   type="video/avc">
-            <Limit name="size" min="2x2" max="2048x2048" />
+            <Limit name="size" min="2x2" max="4080x4080" />
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
         <MediaCodec name="OMX.ffmpeg.hevc.decoder"   type="video/hevc">
-            <Limit name="size" min="2x2" max="2048x2048" />
+            <Limit name="size" min="2x2" max="4096x4096" />
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
