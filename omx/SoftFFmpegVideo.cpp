@@ -547,9 +547,12 @@ int32_t SoftFFmpegVideo::drainOneOutputBuffer() {
     uint32_t frameHeight = mFrame->height;
 #endif
 
+    // offsets and linesizes must match expected YUV420p layout in:
+    // frameworks/av/media/libstagefright/colorconversion/SoftwareRenderer.cpp
+
     data[0] = dst;
     data[1] = dst + bufferWidth * bufferHeight;
-    data[2] = data[1] + (bufferWidth / 2  * bufferHeight / 2);
+    data[2] = data[1] + bufferWidth * bufferHeight / 4;
     linesize[0] = bufferWidth;
     linesize[1] = bufferWidth / 2;
     linesize[2] = bufferWidth / 2;
