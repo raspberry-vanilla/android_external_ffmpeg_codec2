@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
 #define LOG_TAG "SoftFFmpegAudio"
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -161,12 +162,12 @@ void SoftFFmpegAudio::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec)
 }
 
 bool SoftFFmpegAudio::isConfigured() {
-    return mCtx->channels > 0;
+    return mAudioTgtFmt != AV_SAMPLE_FMT_NONE;
 }
 
 void SoftFFmpegAudio::resetCtx() {
-    mCtx->channels = 2;
-    mCtx->sample_rate = 44100;
+    mCtx->channels = 0;
+    mCtx->sample_rate = 0;
     mCtx->bit_rate = 0;
     mCtx->sample_fmt = AV_SAMPLE_FMT_NONE;
 
@@ -332,6 +333,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
 
+            ALOGV("get OMX_IndexParamAudioAac params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
+
             return OMX_ErrorNone;
         }
 
@@ -376,6 +380,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
 
+            ALOGV("get OMX_IndexParamAudioMp3 params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
+
             return OMX_ErrorNone;
         }
         case OMX_IndexParamAudioVorbis:
@@ -398,6 +405,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
 
+            ALOGV("get OMX_IndexParamAudioVorbis params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
+
             return OMX_ErrorNone;
         }
 
@@ -418,6 +428,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nBlockAlign = mCtx->block_align;
             profile->nBitRate = mCtx->bit_rate;
 
+            ALOGV("get OMX_IndexParamAudioWma params, nChannels:%u, nSamplingRate:%u",
+                   profile->nChannels, profile->nSamplingRate);
+
             return OMX_ErrorNone;
         }
 
@@ -437,6 +450,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nNumRegions = mCtx->block_align;
 
+            ALOGV("get OMX_IndexParamAudioRa params, nChannels:%u, nSamplingRate:%u",
+                   profile->nChannels, profile->nSamplingRate);
+
             return OMX_ErrorNone;
         }
 
@@ -452,6 +468,10 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
             profile->nCompressionLevel = mCtx->bits_per_raw_sample;
+
+            ALOGV("get OMX_IndexParamAudioFlac params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
+
             return OMX_ErrorNone;
         }
 
@@ -466,6 +486,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
+
+            ALOGV("get OMX_IndexParamAudioMp2 params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
 
             return OMX_ErrorNone;
         }
@@ -482,6 +505,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
 
+            ALOGV("get OMX_IndexParamAudioAndroidAc3 params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
+
             return OMX_ErrorNone;
         }
 
@@ -497,6 +523,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nChannels = mCtx->channels;
             profile->nSamplingRate = mCtx->sample_rate;
+
+            ALOGV("get OMX_IndexParamAudioAc3 params, nChannels:%u, nSamplingRate:%u",
+                   profile->nChannels, profile->nSamplingRate);
 
             return OMX_ErrorNone;
         }
@@ -515,6 +544,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nBitsPerSample = mCtx->bits_per_coded_sample;
 
+            ALOGV("get OMX_IndexParamAudioAlac params, nChannels:%u, nSamplingRate:%u",
+                   profile->nChannels, profile->nSamplingRate);
+
             return OMX_ErrorNone;
         }
 
@@ -532,6 +564,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nBitsPerSample = mCtx->bits_per_coded_sample;
 
+            ALOGV("get OMX_IndexParamAudioApe params, nChannels:%u, nSamplingRate:%u",
+                   profile->nChannels, profile->nSamplingRate);
+
             return OMX_ErrorNone;
         }
 
@@ -546,6 +581,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nChannels = mCtx->channels;
             profile->nSamplingRate = mCtx->sample_rate;
+
+            ALOGV("get OMX_IndexParamAudioDts params, nChannels:%u, nSamplingRate:%u",
+                   profile->nChannels, profile->nSamplingRate);
 
             return OMX_ErrorNone;
         }
@@ -568,6 +606,9 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalGetParameter(
 
             profile->nChannels = mCtx->channels;
             profile->nSampleRate = mCtx->sample_rate;
+
+            ALOGV("get OMX_IndexParamAudioFFmpeg params, nChannels:%u, nSampleRate:%u",
+                   profile->nChannels, profile->nSampleRate);
 
             return OMX_ErrorNone;
         }
@@ -654,6 +695,7 @@ OMX_ERRORTYPE SoftFFmpegAudio::internalSetParameter(
 
             mAudioTgtFreq = profile->nSamplingRate;
             mAudioTgtChannels = profile->nChannels;
+            mAudioTgtChannelLayout = av_get_default_channel_layout(mAudioTgtChannels);
 
             ALOGV("set OMX_IndexParamAudioPcm, nChannels:%u, "
                     "nSampleRate:%u, nBitPerSample:%u",
@@ -1576,7 +1618,9 @@ int64_t SoftFFmpegAudio::getAudioClock() {
         sAudioClock = (int64_t*) malloc(sizeof(int64_t));
         *sAudioClock = 0;
     }
+#if DEBUG_FRM
     ALOGV("getAudioClock: %" PRId64, *sAudioClock);
+#endif
     return *sAudioClock;
 }
 
