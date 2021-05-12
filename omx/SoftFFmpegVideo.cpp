@@ -48,6 +48,11 @@ static const CodecProfileLevel kAVCProfileLevels[] = {
     { OMX_VIDEO_AVCProfileHigh,     OMX_VIDEO_AVCLevel52 },
 };
 
+static const CodecProfileLevel kHEVCProfileLevels[] = {
+    { OMX_VIDEO_HEVCProfileMain,      OMX_VIDEO_HEVCMainTierLevel51 },
+    { OMX_VIDEO_HEVCProfileMainStill, OMX_VIDEO_HEVCMainTierLevel51 },
+};
+
 SoftFFmpegVideo::SoftFFmpegVideo(
         const char *name,
         const char *componentRole,
@@ -818,6 +823,9 @@ SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
     } else if (!strcmp(name, "OMX.ffmpeg.h264.decoder")) {
         codec_profile_levels = kAVCProfileLevels;
         codec_array_size = ARRAY_SIZE(kAVCProfileLevels);
+    } else if (!strcmp(name, "OMX.ffmpeg.hevc.decoder")) {
+        codec_profile_levels = kHEVCProfileLevels;
+        codec_array_size = ARRAY_SIZE(kHEVCProfileLevels);
     } else {
         codec_profile_levels = NULL;
         codec_array_size = 0;
