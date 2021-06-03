@@ -105,7 +105,7 @@ SoftFFmpegVideo::~SoftFFmpegVideo() {
 }
 
 void SoftFFmpegVideo::setDefaultCtx(AVCodecContext *avctx, const AVCodec *codec __unused) {
-    int fast = 1;
+    int fast = property_get_bool("debug.ffmpeg.fast", 0);
 
     avctx->workaround_bugs   = 1;
     avctx->idct_algo         = 0;
