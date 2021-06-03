@@ -95,6 +95,7 @@ private:
     int32_t mOutputHeight;
 
     bool mSignalledError;
+    int mLoggedError;
 
     void     initInputFormat(uint32_t mode, OMX_PARAM_PORTDEFINITIONTYPE *def);
     void     getInputFormat(uint32_t mode, OMX_VIDEO_PARAM_PORTFORMATTYPE *formatParams);
