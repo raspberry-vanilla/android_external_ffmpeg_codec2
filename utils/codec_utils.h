@@ -31,6 +31,17 @@ struct AMediaFormat;
 
 namespace android {
 
+// Helper datastructures to pass extra information from extractor to codecs
+typedef struct {
+    int32_t codec_id;
+    int32_t bits_per_coded_sample;
+    int32_t block_align;
+} FFMPEGAudioCodecInfo;
+
+typedef struct {
+    int32_t codec_id;
+} FFMPEGVideoCodecInfo;
+
 //video
 media_status_t setAVCFormat(AVCodecParameters *avpar, AMediaFormat *meta);
 media_status_t setH264Format(AVCodecParameters *avpar, AMediaFormat *meta);

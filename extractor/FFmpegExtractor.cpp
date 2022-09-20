@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+//#define LOG_NDEBUG 0
 #define LOG_TAG "FFmpegExtractor"
 #include <utils/Log.h>
 
@@ -431,7 +432,7 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
         if (avpar->extradata_size > 0) {
             AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
         }
-        //CHECK(!"Should not be here. Unsupported codec.");
+        ret = AMEDIA_OK;
         break;
     }
 
@@ -485,6 +486,12 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
         }
         AMediaFormat_setString(meta, "file-format", findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
+
+        FFMPEGVideoCodecInfo info = {
+            .codec_id = avpar->codec_id,
+        };
+
+        AMediaFormat_setBuffer(meta, "raw-codec-data", &info, sizeof(info));
     }
 
     return AMEDIA_OK;
@@ -550,7 +557,7 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
         if (avpar->extradata_size > 0) {
             AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
         }
-        //CHECK(!"Should not be here. Unsupported codec.");
+        ret = AMEDIA_OK;
         break;
     }
 
@@ -574,6 +581,14 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
         //AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING, sampleFormatToEncoding(avpar->sample_fmt));
         AMediaFormat_setString(meta, "file-format", findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
+
+        FFMPEGAudioCodecInfo info = {
+            .codec_id = avpar->codec_id,
+            .bits_per_coded_sample = avpar->bits_per_coded_sample,
+            .block_align = avpar->block_align,
+        };
+
+        AMediaFormat_setBuffer(meta, "raw-codec-data", &info, sizeof(info));
     }
 
     return AMEDIA_OK;

@@ -38,6 +38,7 @@ extern "C" {
 #else
 #include "libswresample/swresample.h"
 #endif
+#include "libavutil/opt.h"
 
 #include <system/audio.h>
 
