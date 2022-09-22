@@ -21,11 +21,11 @@
 #include <OMX_AudioExt.h>
 #include <OMX_IndexExt.h>
 
+#include <media/stagefright/FFMPEGOmxExtn.h>
+
 #include "config.h"
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
-
-#include <OMX_FFMPEG_Extn.h>
 
 namespace android {
 

@@ -16,35 +16,13 @@
 
 include $(CLEAR_VARS)
 
+# Include base FFMPEG definitions.
 include external/$(AV_CODEC_LIB)/android/$(AV_CODEC_LIB).mk
 
-# put the libraries to /vendor
-LOCAL_PROPRIETARY_MODULE := true
-
-LOCAL_C_INCLUDES += \
-	$(LOCAL_PATH)/../include \
-	$(LOCAL_PATH)/.. \
-	frameworks/native/include/media/openmax \
-	frameworks/av/include \
-	frameworks/av/media/libstagefright
-
-LOCAL_SHARED_LIBRARIES := \
-	libutils \
-	libcutils \
-	libavcodec \
-	libavformat \
-	libavutil \
-	libstagefright \
-	libstagefright_foundation
-
-ifneq ($(filter arm arm64,$(TARGET_ARCH)),)
-	LOCAL_CFLAGS += -Wno-psabi
-endif
-
+# Some flags to work with FFMEG headers.
 LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
+LOCAL_CFLAGS += -Wno-deprecated-declarations
 
-# Quiet some noise
-LOCAL_CFLAGS += -Wno-deprecated-declarations -Wno-unused-parameter
-LOCAL_CLANG_CFLAGS += -Wno-unknown-attributes
-
+# All modules are installed on /vendor and optional.
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_TAGS := optional

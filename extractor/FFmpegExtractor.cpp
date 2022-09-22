@@ -39,8 +39,8 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 
-#include "utils/codec_utils.h"
-#include "utils/ffmpeg_cmdutils.h"
+#include "codec_utils.h"
+#include "ffmpeg_cmdutils.h"
 
 #include "FFmpegExtractor.h"
 

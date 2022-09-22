@@ -5,21 +5,20 @@ include $(SF_COMMON_MK)
 LOCAL_SRC_FILES := \
 	FFmpegOMXPlugin.cpp \
 	SoftFFmpegAudio.cpp \
-	SoftFFmpegVideo.cpp \
-	ffmpeg_hwaccel.c \
-
-LOCAL_C_INCLUDES += \
-	$(TOP)/frameworks/native/include/media/hardware
+	SoftFFmpegVideo.cpp
 
 LOCAL_SHARED_LIBRARIES += \
-	libdl             \
+	libavcodec        \
+	libavutil         \
+	libcutils         \
 	libffmpeg_utils   \
-	android.hidl.memory@1.0	\
 	$(if $(filter true,$(BOARD_USE_LIBAV)),libavresample,libswresample) \
 	liblog            \
-	libnativewindow   \
 	libswscale        \
-	libstagefright_softomx
+	libstagefright    \
+	libstagefright_foundation \
+	libstagefright_softomx \
+	libutils
 
 LOCAL_MODULE:= libffmpeg_omx
 

@@ -25,7 +25,7 @@
 #include <utils/threads.h>
 #include <utils/KeyedVector.h>
 
-#include "utils/ffmpeg_utils.h"
+#include "ffmpeg_utils.h"
 
 namespace android {
 

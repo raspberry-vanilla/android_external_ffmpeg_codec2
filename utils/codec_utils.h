@@ -22,6 +22,7 @@
 #include <stdlib.h>
 
 #include <utils/Errors.h>
+#include <media/NdkMediaError.h>
 #include <media/stagefright/foundation/ABuffer.h>
 
 #include "ffmpeg_utils.h"

@@ -31,23 +31,7 @@ extern "C" {
 #include "config.h"
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
-
-#include "libavutil/avstring.h"
-#include "libavutil/colorspace.h"
-#include "libavutil/mathematics.h"
-#include "libavutil/pixdesc.h"
-#include "libavutil/imgutils.h"
-#include "libavutil/dict.h"
-#include "libavutil/parseutils.h"
-#include "libavutil/samplefmt.h"
-#include "libavutil/avassert.h"
-#include "libavformat/avformat.h"
-#include "libavdevice/avdevice.h"
 #include "libswscale/swscale.h"
-#include "libavutil/opt.h"
-#include "libavutil/internal.h"
-#include "libavcodec/avfft.h"
-#include "libavcodec/xiph.h"
 #ifdef LIBAV_CONFIG_H
 #include "libavresample/avresample.h"
 #else

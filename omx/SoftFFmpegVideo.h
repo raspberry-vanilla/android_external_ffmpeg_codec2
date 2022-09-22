@@ -21,7 +21,7 @@
 
 #include <media/stagefright/omx/SoftVideoDecoderOMXComponent.h>
 
-#include "utils/ffmpeg_utils.h"
+#include "ffmpeg_utils.h"
 
 namespace android {
 

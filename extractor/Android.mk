@@ -6,10 +6,15 @@ LOCAL_SRC_FILES := \
 	FFmpegExtractor.cpp
 
 LOCAL_SHARED_LIBRARIES += \
-	libbinder         \
+	libavcodec        \
+	libavformat       \
+	libavutil         \
+	libcutils         \
 	libffmpeg_utils   \
-	libmediandk       \
-	liblog
+	liblog            \
+	libstagefright    \
+	libstagefright_foundation \
+	libutils
 
 LOCAL_MODULE:= libffmpeg_extractor
 LOCAL_MODULE_RELATIVE_PATH := extractors

@@ -18,17 +18,14 @@
 
 #define FFMPEG_OMX_PLUGIN_H_
 
+#include <media/hardware/OMXPluginBase.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <OMXPluginBase.h>
 
-#include <OMX_AudioExt.h>
-#include <OMX_IndexExt.h>
+#include <OMX_Core.h>
 
 #include "config.h"
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
-
-#include <OMX_FFMPEG_Extn.h>
 
 namespace android {
 

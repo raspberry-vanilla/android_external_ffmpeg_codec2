@@ -26,7 +26,7 @@
 #error "__GNUC__ cflags should be enabled"
 #endif
 
-#include "utils/ffmpeg_utils.h"
+#include "ffmpeg_utils.h"
 
 #include <OMX_AudioExt.h>
 #include <OMX_IndexExt.h>
