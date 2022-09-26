@@ -233,23 +233,23 @@ uint32_t FFmpegExtractor::flags() const {
     return flags;
 }
 
-int FFmpegExtractor::check_extradata(AVCodecContext *avctx)
+int FFmpegExtractor::check_extradata(AVCodecParameters *avpar)
 {
     enum AVCodecID codec_id = AV_CODEC_ID_NONE;
     const char *name = NULL;
     bool *defersToCreateTrack = NULL;
-    AVBitStreamFilterContext **bsfc = NULL;
+    AVBSFContext **bsfc = NULL;
 
     // init
-    if (avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
+    if (avpar->codec_type == AVMEDIA_TYPE_VIDEO) {
         bsfc = &mVideoBsfc;
         defersToCreateTrack = &mDefersToCreateVideoTrack;
-    } else if (avctx->codec_type == AVMEDIA_TYPE_AUDIO){
+    } else if (avpar->codec_type == AVMEDIA_TYPE_AUDIO){
         bsfc = &mAudioBsfc;
         defersToCreateTrack = &mDefersToCreateAudioTrack;
     }
 
-    codec_id = avctx->codec_id;
+    codec_id = avpar->codec_id;
 
     // ignore extradata
     if (codec_id != AV_CODEC_ID_H264
@@ -262,10 +262,10 @@ int FFmpegExtractor::check_extradata(AVCodecContext *avctx)
 
     // is extradata compatible with android?
     if (codec_id != AV_CODEC_ID_AAC) {
-        int is_compatible = is_extradata_compatible_with_android(avctx);
+        int is_compatible = is_extradata_compatible_with_android(avpar);
         if (!is_compatible) {
             ALOGI("%s extradata is not compatible with android, should to extract it from bitstream",
-                    av_get_media_type_string(avctx->codec_type));
+                    av_get_media_type_string(avpar->codec_type));
             *defersToCreateTrack = true;
             *bsfc = NULL; // H264 don't need bsfc, only AAC?
             return 0;
@@ -277,21 +277,32 @@ int FFmpegExtractor::check_extradata(AVCodecContext *avctx)
         name = "aac_adtstoasc";
     }
 
-    if (avctx->extradata_size <= 0) {
+    if (avpar->extradata_size <= 0) {
         ALOGI("No %s extradata found, should to extract it from bitstream",
-                av_get_media_type_string(avctx->codec_type));
+                av_get_media_type_string(avpar->codec_type));
         *defersToCreateTrack = true;
          //CHECK(name != NULL);
         if (!*bsfc && name) {
-            *bsfc = av_bitstream_filter_init(name);
-            if (!*bsfc) {
-                ALOGE("Cannot open the %s BSF!", name);
+            const AVBitStreamFilter* bsf = av_bsf_get_by_name(name);
+            if (!bsf) {
+                ALOGE("[%s] cannot find bitstream filter", name);
                 *defersToCreateTrack = false;
                 return -1;
-            } else {
-                ALOGV("open the %s bsf", name);
-                return 0;
             }
+            if (av_bsf_alloc(bsf, bsfc) < 0 || !*bsfc) {
+                ALOGE("[%s] cannot allocate bitstream filter", name);
+                *defersToCreateTrack = false;
+                return -1;
+            }
+            // (*bsfc)->time_base_in = avpar->time_base;
+            if (avcodec_parameters_copy((*bsfc)->par_in, avpar)
+                    || av_bsf_init(*bsfc)) {
+                ALOGE("[%s] cannot initialize bitstream filter", name);
+                *defersToCreateTrack = false;
+                return -1;
+            }
+            ALOGV("[%s] created bitstream filter", name);
+            return 0;
         } else {
             return 0;
         }
@@ -370,72 +381,72 @@ bool FFmpegExtractor::is_codec_supported(enum AVCodecID codec_id)
 
 media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *meta)
 {
-    AVCodecContext *avctx = NULL;
+    AVCodecParameters *avpar = NULL;
     media_status_t ret = AMEDIA_ERROR_UNKNOWN;
 
-    avctx = stream->codec;
-    CHECK_EQ((int)avctx->codec_type, (int)AVMEDIA_TYPE_VIDEO);
+    avpar = stream->codecpar;
+    CHECK_EQ((int)avpar->codec_type, (int)AVMEDIA_TYPE_VIDEO);
 
-    switch(avctx->codec_id) {
+    switch(avpar->codec_id) {
     case AV_CODEC_ID_H264:
-        if (avctx->extradata[0] == 1) {
-            ret = setAVCFormat(avctx, meta);
+        if (avpar->extradata[0] == 1) {
+            ret = setAVCFormat(avpar, meta);
         } else {
-            ret = setH264Format(avctx, meta);
+            ret = setH264Format(avpar, meta);
         }
         break;
     case AV_CODEC_ID_MPEG4:
-        ret = setMPEG4Format(avctx, meta);
+        ret = setMPEG4Format(avpar, meta);
         break;
     case AV_CODEC_ID_H263:
     case AV_CODEC_ID_H263P:
     case AV_CODEC_ID_H263I:
-        ret = setH263Format(avctx, meta);
+        ret = setH263Format(avpar, meta);
         break;
     case AV_CODEC_ID_MPEG1VIDEO:
     case AV_CODEC_ID_MPEG2VIDEO:
-        ret = setMPEG2VIDEOFormat(avctx, meta);
+        ret = setMPEG2VIDEOFormat(avpar, meta);
         break;
     case AV_CODEC_ID_VC1:
-        ret = setVC1Format(avctx, meta);
+        ret = setVC1Format(avpar, meta);
         break;
     case AV_CODEC_ID_WMV1:
-        ret = setWMV1Format(avctx, meta);
+        ret = setWMV1Format(avpar, meta);
         break;
     case AV_CODEC_ID_WMV2:
-        ret = setWMV2Format(avctx, meta);
+        ret = setWMV2Format(avpar, meta);
         break;
     case AV_CODEC_ID_WMV3:
-        ret = setWMV3Format(avctx, meta);
+        ret = setWMV3Format(avpar, meta);
         break;
     case AV_CODEC_ID_RV20:
-        ret = setRV20Format(avctx, meta);
+        ret = setRV20Format(avpar, meta);
         break;
     case AV_CODEC_ID_RV30:
-        ret = setRV30Format(avctx, meta);
+        ret = setRV30Format(avpar, meta);
         break;
     case AV_CODEC_ID_RV40:
-        ret = setRV40Format(avctx, meta);
+        ret = setRV40Format(avpar, meta);
         break;
     case AV_CODEC_ID_FLV1:
-        ret = setFLV1Format(avctx, meta);
+        ret = setFLV1Format(avpar, meta);
         break;
     case AV_CODEC_ID_HEVC:
-        ret = setHEVCFormat(avctx, meta);
+        ret = setHEVCFormat(avpar, meta);
         break;
     case AV_CODEC_ID_VP8:
-        ret = setVP8Format(avctx, meta);
+        ret = setVP8Format(avpar, meta);
         break;
     case AV_CODEC_ID_VP9:
-        ret = setVP9Format(avctx, meta);
+        ret = setVP9Format(avpar, meta);
         break;
     default:
         ALOGD("unsupported video codec (id: %d, name: %s), but give it a chance",
-                avctx->codec_id, avcodec_get_name(avctx->codec_id));
-        AMediaFormat_setInt32(meta, "codec-id", avctx->codec_id);
+                avpar->codec_id, avcodec_get_name(avpar->codec_id));
+        AMediaFormat_setInt32(meta, "codec-id", avpar->codec_id);
         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_FFMPEG);
-        if (avctx->extradata_size > 0) {
-            AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+        if (avpar->extradata_size > 0) {
+            AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
         }
         //CHECK(!"Should not be here. Unsupported codec.");
         break;
@@ -462,32 +473,32 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
         float aspect_ratio;
         int width, height;
 
-        if (avctx->sample_aspect_ratio.num == 0)
+        if (avpar->sample_aspect_ratio.num == 0)
             aspect_ratio = 0;
         else
-            aspect_ratio = av_q2d(avctx->sample_aspect_ratio);
+            aspect_ratio = av_q2d(avpar->sample_aspect_ratio);
 
         if (aspect_ratio <= 0.0)
             aspect_ratio = 1.0;
-        aspect_ratio *= (float)avctx->width / (float)avctx->height;
+        aspect_ratio *= (float)avpar->width / (float)avpar->height;
 
         /* XXX: we suppose the screen has a 1.0 pixel ratio */
-        height = avctx->height;
+        height = avpar->height;
         width = ((int)rint(height * aspect_ratio)) & ~1;
 
         ALOGI("width: %d, height: %d, bit_rate: % " PRId64 " aspect ratio: %f",
-                avctx->width, avctx->height, avctx->bit_rate, aspect_ratio);
+                avpar->width, avpar->height, avpar->bit_rate, aspect_ratio);
 
-        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_WIDTH, avctx->width);
-        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_HEIGHT, avctx->height);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_WIDTH, avpar->width);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_HEIGHT, avpar->height);
         if ((width > 0) && (height > 0) &&
-            ((avctx->width != width || avctx->height != height))) {
+            ((avpar->width != width || avpar->height != height))) {
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAR_WIDTH, width);
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_SAR_HEIGHT, height);
             ALOGI("SAR width: %d, SAR height: %d", width, height);
         }
-        if (avctx->bit_rate > 0) {
-            AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avctx->bit_rate);
+        if (avpar->bit_rate > 0) {
+            AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avpar->bit_rate);
         }
         AMediaFormat_setString(meta, "file-format", findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
@@ -498,63 +509,63 @@ media_status_t FFmpegExtractor::setVideoFormat(AVStream *stream, AMediaFormat *m
 
 media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *meta)
 {
-    AVCodecContext *avctx = NULL;
+    AVCodecParameters *avpar = NULL;
     media_status_t ret = AMEDIA_ERROR_UNKNOWN;
 
-    avctx = stream->codec;
-    CHECK_EQ((int)avctx->codec_type, (int)AVMEDIA_TYPE_AUDIO);
+    avpar = stream->codecpar;
+    CHECK_EQ((int)avpar->codec_type, (int)AVMEDIA_TYPE_AUDIO);
 
-    switch(avctx->codec_id) {
+    switch(avpar->codec_id) {
     case AV_CODEC_ID_MP2:
-        ret = setMP2Format(avctx, meta);
+        ret = setMP2Format(avpar, meta);
         break;
     case AV_CODEC_ID_MP3:
-        ret = setMP3Format(avctx, meta);
+        ret = setMP3Format(avpar, meta);
         break;
     case AV_CODEC_ID_VORBIS:
-        ret = setVORBISFormat(avctx, meta);
+        ret = setVORBISFormat(avpar, meta);
         break;
     case AV_CODEC_ID_AC3:
-        ret = setAC3Format(avctx, meta);
+        ret = setAC3Format(avpar, meta);
         break;
     case AV_CODEC_ID_AAC:
-        ret = setAACFormat(avctx, meta);
+        ret = setAACFormat(avpar, meta);
         break;
     case AV_CODEC_ID_WMAV1:
-        ret = setWMAV1Format(avctx, meta);
+        ret = setWMAV1Format(avpar, meta);
         break;
     case AV_CODEC_ID_WMAV2:
-        ret = setWMAV2Format(avctx, meta);
+        ret = setWMAV2Format(avpar, meta);
         break;
     case AV_CODEC_ID_WMAPRO:
-        ret = setWMAProFormat(avctx, meta);
+        ret = setWMAProFormat(avpar, meta);
         break;
     case AV_CODEC_ID_WMALOSSLESS:
-        ret = setWMALossLessFormat(avctx, meta);
+        ret = setWMALossLessFormat(avpar, meta);
         break;
     case AV_CODEC_ID_COOK:
-        ret = setRAFormat(avctx, meta);
+        ret = setRAFormat(avpar, meta);
         break;
     case AV_CODEC_ID_APE:
-        ret = setAPEFormat(avctx, meta);
+        ret = setAPEFormat(avpar, meta);
         break;
     case AV_CODEC_ID_DTS:
-        ret = setDTSFormat(avctx, meta);
+        ret = setDTSFormat(avpar, meta);
         break;
     case AV_CODEC_ID_FLAC:
-        ret = setFLACFormat(avctx, meta);
+        ret = setFLACFormat(avpar, meta);
         break;
     case AV_CODEC_ID_ALAC:
-        ret = setALACFormat(avctx, meta);
+        ret = setALACFormat(avpar, meta);
         break;
     default:
         ALOGD("unsupported audio codec (id: %d, name: %s), but give it a chance",
-                avctx->codec_id, avcodec_get_name(avctx->codec_id));
-        AMediaFormat_setInt32(meta, "codec-id", avctx->codec_id);
-        AMediaFormat_setInt32(meta, "coded-sample-bits", avctx->bits_per_coded_sample);
+                avpar->codec_id, avcodec_get_name(avpar->codec_id));
+        AMediaFormat_setInt32(meta, "codec-id", avpar->codec_id);
+        AMediaFormat_setInt32(meta, "coded-sample-bits", avpar->bits_per_coded_sample);
         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FFMPEG);
-        if (avctx->extradata_size > 0) {
-            AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+        if (avpar->extradata_size > 0) {
+            AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
         }
         //CHECK(!"Should not be here. Unsupported codec.");
         break;
@@ -564,20 +575,20 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
         ALOGD("bit_rate: %" PRId64 ", sample_rate: %d, channels: %d, "
                 "bits_per_coded_sample: %d, block_align: %d "
                 "bits_per_raw_sample: %d, sample_format: %d",
-                avctx->bit_rate, avctx->sample_rate, avctx->channels,
-                avctx->bits_per_coded_sample, avctx->block_align,
-                avctx->bits_per_raw_sample, avctx->sample_fmt);
+                avpar->bit_rate, avpar->sample_rate, avpar->channels,
+                avpar->bits_per_coded_sample, avpar->block_align,
+                avpar->bits_per_raw_sample, avpar->format);
 
-        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, avctx->channels);
-        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avctx->bit_rate);
-        int32_t bits = avctx->bits_per_raw_sample > 0 ?
-                avctx->bits_per_raw_sample :
-                av_get_bytes_per_sample(avctx->sample_fmt) * 8;
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, avpar->channels);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avpar->bit_rate);
+        int32_t bits = avpar->bits_per_raw_sample > 0 ?
+                avpar->bits_per_raw_sample :
+                av_get_bytes_per_sample((enum AVSampleFormat)avpar->format) * 8;
         AMediaFormat_setInt32(meta, "bits-per-raw-sample", bits);
-        AMediaFormat_setInt32(meta, "sample-rate", avctx->sample_rate);
-        AMediaFormat_setInt32(meta, "block-align", avctx->block_align);
-        AMediaFormat_setInt32(meta, "sample-format", avctx->sample_fmt);
-        //AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING, sampleFormatToEncoding(avctx->sample_fmt));
+        AMediaFormat_setInt32(meta, "sample-rate", avpar->sample_rate);
+        AMediaFormat_setInt32(meta, "block-align", avpar->block_align);
+        AMediaFormat_setInt32(meta, "sample-format", avpar->format);
+        //AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_PCM_ENCODING, sampleFormatToEncoding(avpar->sample_fmt));
         AMediaFormat_setString(meta, "file-format", findMatchingContainer(mFormatCtx->iformat->name));
         setDurationMetaData(stream, meta);
     }
@@ -587,12 +598,12 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
 
 void FFmpegExtractor::setDurationMetaData(AVStream *stream, AMediaFormat *meta)
 {
-    AVCodecContext *avctx = stream->codec;
+    AVCodecParameters *avpar = stream->codecpar;
 
     if (stream->duration != AV_NOPTS_VALUE) {
         int64_t duration = av_rescale_q(stream->duration, stream->time_base, AV_TIME_BASE_Q);
         printTime(duration);
-        const char *s = av_get_media_type_string(avctx->codec_type);
+        const char *s = av_get_media_type_string(avpar->codec_type);
         if (stream->start_time != AV_NOPTS_VALUE) {
             ALOGV("%s startTime: %" PRId64, s, stream->start_time);
         } else {
@@ -608,26 +619,26 @@ void FFmpegExtractor::setDurationMetaData(AVStream *stream, AMediaFormat *meta)
 int FFmpegExtractor::stream_component_open(int stream_index)
 {
     TrackInfo *trackInfo = NULL;
-    AVCodecContext *avctx = NULL;
+    AVCodecParameters *avpar = NULL;
     bool supported = false;
     int ret = 0;
 
     ALOGI("stream_index: %d", stream_index);
     if (stream_index < 0 || stream_index >= (int)mFormatCtx->nb_streams)
         return -1;
-    avctx = mFormatCtx->streams[stream_index]->codec;
+    avpar = mFormatCtx->streams[stream_index]->codecpar;
 
-    supported = is_codec_supported(avctx->codec_id);
+    supported = is_codec_supported(avpar->codec_id);
 
     if (!supported) {
-        ALOGE("unsupport the codec(%s)", avcodec_get_name(avctx->codec_id));
+        ALOGE("unsupport the codec(%s)", avcodec_get_name(avpar->codec_id));
         return -1;
     } else if ((mFormatCtx->streams[stream_index]->disposition & AV_DISPOSITION_ATTACHED_PIC) ||
-                avctx->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
-        ALOGD("not opening attached picture(%s)", avcodec_get_name(avctx->codec_id));
+                avpar->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
+        ALOGD("not opening attached picture(%s)", avcodec_get_name(avpar->codec_id));
         return -1;
     }
-    ALOGI("support the codec(%s) disposition(%x)", avcodec_get_name(avctx->codec_id), mFormatCtx->streams[stream_index]->disposition);
+    ALOGI("support the codec(%s) disposition(%x)", avcodec_get_name(avpar->codec_id), mFormatCtx->streams[stream_index]->disposition);
 
     for (size_t i = 0; i < mTracks.size(); ++i) {
         if (stream_index == mTracks.editItemAt(i).mIndex) {
@@ -638,20 +649,19 @@ int FFmpegExtractor::stream_component_open(int stream_index)
 
     mFormatCtx->streams[stream_index]->discard = AVDISCARD_DEFAULT;
 
-    char tagbuf[32];
-    av_get_codec_tag_string(tagbuf, sizeof(tagbuf), avctx->codec_tag);
-    ALOGV("Tag %s/0x%08x with codec(%s)\n", tagbuf, avctx->codec_tag, avcodec_get_name(avctx->codec_id));
+    ALOGV("Tag %s/0x%08x with codec(%s)\n",
+          av_fourcc2str(avpar->codec_tag), avpar->codec_tag, avcodec_get_name(avpar->codec_id));
 
     AMediaFormat *meta = AMediaFormat_new();
 
-    switch (avctx->codec_type) {
+    switch (avpar->codec_type) {
     case AVMEDIA_TYPE_VIDEO:
         if (mVideoStreamIdx == -1)
             mVideoStreamIdx = stream_index;
         if (mVideoStream == NULL)
             mVideoStream = mFormatCtx->streams[stream_index];
 
-        ret = check_extradata(avctx);
+        ret = check_extradata(avpar);
         if (ret != 1) {
             if (ret == -1) {
                 // disable the stream
@@ -663,9 +673,9 @@ int FFmpegExtractor::stream_component_open(int stream_index)
             return ret;
          }
 #if DEBUG_EXTRADATA
-        if (avctx->extradata) {
+        if (avpar->extradata) {
             ALOGV("video stream extradata:");
-            hexdump(avctx->extradata, avctx->extradata_size);
+            hexdump(avpar->extradata, avpar->extradata_size);
         } else {
             ALOGV("video stream no extradata, but we can ignore it.");
         }
@@ -692,7 +702,7 @@ int FFmpegExtractor::stream_component_open(int stream_index)
         if (mAudioStream == NULL)
             mAudioStream = mFormatCtx->streams[stream_index];
 
-        ret = check_extradata(avctx);
+        ret = check_extradata(avpar);
         if (ret != 1) {
             if (ret == -1) {
                 // disable the stream
@@ -704,9 +714,9 @@ int FFmpegExtractor::stream_component_open(int stream_index)
             return ret;
         }
 #if DEBUG_EXTRADATA
-        if (avctx->extradata) {
-            ALOGV("audio stream extradata(%d):", avctx->extradata_size);
-            hexdump(avctx->extradata, avctx->extradata_size);
+        if (avpar->extradata) {
+            ALOGV("audio stream extradata(%d):", avpar->extradata_size);
+            hexdump(avpar->extradata, avpar->extradata_size);
         } else {
             ALOGV("audio stream no extradata, but we can ignore it.");
         }
@@ -740,13 +750,13 @@ int FFmpegExtractor::stream_component_open(int stream_index)
 
 void FFmpegExtractor::stream_component_close(int stream_index)
 {
-    AVCodecContext *avctx;
+    AVCodecParameters *avpar;
 
     if (stream_index < 0 || stream_index >= (int)mFormatCtx->nb_streams)
         return;
-    avctx = mFormatCtx->streams[stream_index]->codec;
+    avpar = mFormatCtx->streams[stream_index]->codecpar;
 
-    switch (avctx->codec_type) {
+    switch (avpar->codec_type) {
     case AVMEDIA_TYPE_VIDEO:
         ALOGV("packet_queue_abort videoq");
         packet_queue_abort(&mVideoQ);
@@ -766,21 +776,19 @@ void FFmpegExtractor::stream_component_close(int stream_index)
     }
 
     mFormatCtx->streams[stream_index]->discard = AVDISCARD_ALL;
-    switch (avctx->codec_type) {
+    switch (avpar->codec_type) {
     case AVMEDIA_TYPE_VIDEO:
         mVideoStream    = NULL;
         mVideoStreamIdx = -1;
         if (mVideoBsfc) {
-            av_bitstream_filter_close(mVideoBsfc);
-            mVideoBsfc  = NULL;
+            av_bsf_free(&mVideoBsfc);
         }
         break;
     case AVMEDIA_TYPE_AUDIO:
         mAudioStream    = NULL;
         mAudioStreamIdx = -1;
         if (mAudioBsfc) {
-            av_bitstream_filter_close(mAudioBsfc);
-            mAudioBsfc  = NULL;
+            av_bsf_free(&mAudioBsfc);
         }
         break;
     case AVMEDIA_TYPE_SUBTITLE:
@@ -1171,12 +1179,10 @@ void FFmpegExtractor::readerEntry() {
                 avformat_seek_file(mFormatCtx, -1, 0, 0, 0, 0);
             }
             if (mAudioStreamIdx >= 0) {
-                packet_queue_flush(&mAudioQ);
-                packet_queue_put(&mAudioQ, &mAudioQ.flush_pkt);
+                packet_queue_flush(&mAudioQ, true);
             }
             if (mVideoStreamIdx >= 0) {
-                packet_queue_flush(&mVideoQ);
-                packet_queue_put(&mVideoQ, &mVideoQ.flush_pkt);
+                packet_queue_flush(&mVideoQ, true);
             }
             mSeekIdx = -1;
             eof = false;
@@ -1242,22 +1248,22 @@ void FFmpegExtractor::readerEntry() {
 
         if (pkt->stream_index == mVideoStreamIdx) {
              if (mDefersToCreateVideoTrack) {
-                AVCodecContext *avctx = mFormatCtx->streams[mVideoStreamIdx]->codec;
+                AVCodecParameters *avpar = mFormatCtx->streams[mVideoStreamIdx]->codecpar;
 
-                int i = parser_split(avctx, pkt->data, pkt->size);
+                int i = parser_split(avpar, pkt->data, pkt->size);
                 if (i > 0 && i < FF_MAX_EXTRADATA_SIZE) {
-                    if (avctx->extradata)
-                        av_freep(&avctx->extradata);
-                    avctx->extradata_size= i;
-                    avctx->extradata = (uint8_t *)av_malloc(avctx->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
-                    if (!avctx->extradata) {
+                    if (avpar->extradata)
+                        av_freep(&avpar->extradata);
+                    avpar->extradata_size= i;
+                    avpar->extradata = (uint8_t *)av_malloc(avpar->extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+                    if (!avpar->extradata) {
                         //return AVERROR(ENOMEM);
                         ret = AVERROR(ENOMEM);
                         goto fail;
                     }
                     // sps + pps(there may be sei in it)
-                    memcpy(avctx->extradata, pkt->data, avctx->extradata_size);
-                    memset(avctx->extradata + i, 0, AV_INPUT_BUFFER_PADDING_SIZE);
+                    memcpy(avpar->extradata, pkt->data, avpar->extradata_size);
+                    memset(avpar->extradata + i, 0, AV_INPUT_BUFFER_PADDING_SIZE);
                 } else {
                     av_packet_unref(pkt);
                     continue;
@@ -1272,24 +1278,38 @@ void FFmpegExtractor::readerEntry() {
             }
         } else if (pkt->stream_index == mAudioStreamIdx) {
             int ret;
-            uint8_t *outbuf;
-            int   outbuf_size;
-            AVCodecContext *avctx = mFormatCtx->streams[mAudioStreamIdx]->codec;
+            AVCodecParameters *avpar = mFormatCtx->streams[mAudioStreamIdx]->codecpar;
             if (mAudioBsfc && pkt && pkt->data) {
-                ret = av_bitstream_filter_filter(mAudioBsfc, avctx, NULL, &outbuf, &outbuf_size,
-                                   pkt->data, pkt->size, pkt->flags & AV_PKT_FLAG_KEY);
-
-                if (ret < 0 ||!outbuf_size) {
+                ret = av_bsf_send_packet(mAudioBsfc, pkt);
+                if (ret < 0) {
+                    ALOGE("[%s] failed to send packet to filter, err = %d", mAudioBsfc->filter->name, ret);
                     av_packet_unref(pkt);
                     continue;
                 }
-                if (outbuf && outbuf != pkt->data) {
-                    memmove(pkt->data, outbuf, outbuf_size);
-                    pkt->size = outbuf_size;
+                ret = av_bsf_receive_packet(mAudioBsfc, pkt);
+                if (ret < 0) {
+                    ALOGE_IF(ret != AVERROR(EAGAIN), "[%s] failed to received packet from filter, err=%d",
+                             mAudioBsfc->filter->name, ret);
+                    continue;
+                }
+                if (mDefersToCreateAudioTrack && avpar->extradata_size <= 0) {
+                    int new_extradata_size = 0;
+                    uint8_t* new_extradata = av_packet_get_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA, &new_extradata_size);
+                    if (new_extradata_size > 0) {
+                        ALOGV("[%s] extradata found, len=%d", mAudioBsfc->filter->name, new_extradata_size);
+                        avpar->extradata = (uint8_t*)av_mallocz(new_extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
+                        if (avpar->extradata) {
+                            memcpy(avpar->extradata, new_extradata, new_extradata_size);
+                            avpar->extradata_size = new_extradata_size;
+                        } else {
+                            ALOGE("[%s] failed to allocate new extradata", mAudioBsfc->filter->name);
+                        }
+                    }
                 }
             }
             if (mDefersToCreateAudioTrack) {
-                if (avctx->extradata_size <= 0) {
+                if (avpar->extradata_size <= 0) {
+                    ALOGD("still no extradata, mProbePkts=%ld", mProbePkts);
                     av_packet_unref(pkt);
                     continue;
                 }
@@ -1333,12 +1353,12 @@ FFmpegSource::FFmpegSource(
     AMediaFormat *meta = mExtractor->mTracks.itemAt(index).mMeta;
 
     {
-        AVCodecContext *avctx = mStream->codec;
+        AVCodecParameters *avpar = mStream->codecpar;
 
         /* Parse codec specific data */
-        if (avctx->codec_id == AV_CODEC_ID_H264
-                && avctx->extradata_size > 0
-                && avctx->extradata[0] == 1) {
+        if (avpar->codec_id == AV_CODEC_ID_H264
+                && avpar->extradata_size > 0
+                && avpar->extradata[0] == 1) {
             mIsAVC = true;
 
             void *data;
@@ -1356,14 +1376,14 @@ FFmpegSource::FFmpegSource(
             ALOGV("the stream is AVC, the length of a NAL unit: %zu", mNALLengthSize);
 
             mNal2AnnexB = true;
-        } else if (avctx->codec_id == AV_CODEC_ID_HEVC
-                && avctx->extradata_size > 3
-                && (avctx->extradata[0] || avctx->extradata[1] ||
-                    avctx->extradata[2] > 1)) {
+        } else if (avpar->codec_id == AV_CODEC_ID_HEVC
+                && avpar->extradata_size > 3
+                && (avpar->extradata[0] || avpar->extradata[1] ||
+                    avpar->extradata[2] > 1)) {
             /* It seems the extradata is encoded as hvcC format.
              * Temporarily, we support configurationVersion==0 until 14496-15 3rd
              * is finalized. When finalized, configurationVersion will be 1 and we
-             * can recognize hvcC by checking if avctx->extradata[0]==1 or not. */
+             * can recognize hvcC by checking if avpar->extradata[0]==1 or not. */
             mIsHEVC = true;
 
             void *data;
@@ -1385,7 +1405,7 @@ FFmpegSource::FFmpegSource(
 
     }
 
-    mMediaType = mStream->codec->codec_type;
+    mMediaType = mStream->codecpar->codec_type;
     mFirstKeyPktTimestamp = AV_NOPTS_VALUE;
 }
 
@@ -1427,6 +1447,7 @@ media_status_t FFmpegSource::read(
     int key = 0;
     media_status_t status = AMEDIA_OK;
     int max_negative_time_frame = 100;
+    bool pktIsFlush = false;
 
     int64_t startTimeUs = mStream->start_time == AV_NOPTS_VALUE ? 0 :
         av_rescale_q(mStream->start_time, mStream->time_base, AV_TIME_BASE_Q);
@@ -1449,8 +1470,10 @@ retry:
         return AMEDIA_ERROR_END_OF_STREAM;
     }
 
+    pktIsFlush = packet_queue_is_flushpacket(mQueue, &pkt);
+
     if (seeking) {
-        if (pkt.data != mQueue->flush_pkt.data) {
+        if (! pktIsFlush) {
             av_packet_unref(&pkt);
             goto retry;
         } else {
@@ -1461,7 +1484,7 @@ retry:
         }
     }
 
-    if (pkt.data == mQueue->flush_pkt.data) {
+    if (pktIsFlush) {
         ALOGV("read %s flush pkt", av_get_media_type_string(mMediaType));
         av_packet_unref(&pkt);
         mFirstKeyPktTimestamp = AV_NOPTS_VALUE;
@@ -1621,10 +1644,10 @@ static formatmap FILE_FORMATS[] = {
         {"divx",                    MEDIA_MIMETYPE_CONTAINER_DIVX     },
 };
 
-static AVCodecContext* getCodecContext(AVFormatContext *ic, AVMediaType codec_type)
+static AVCodecParameters* getCodecParameters(AVFormatContext *ic, AVMediaType codec_type)
 {
     unsigned int idx = 0;
-    AVCodecContext *avctx = NULL;
+    AVCodecParameters *avpar = NULL;
 
     for (idx = 0; idx < ic->nb_streams; idx++) {
         if (ic->streams[idx]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
@@ -1635,13 +1658,13 @@ static AVCodecContext* getCodecContext(AVFormatContext *ic, AVMediaType codec_ty
             continue;
         }
 
-        avctx = ic->streams[idx]->codec;
-        if (avctx->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
+        avpar = ic->streams[idx]->codecpar;
+        if (avpar->codec_tag == MKTAG('j', 'p', 'e', 'g')) {
             // Sometimes the disposition isn't set
             continue;
         }
-        if (avctx->codec_type == codec_type) {
-            return avctx;
+        if (avpar->codec_type == codec_type) {
+            return avpar;
         }
     }
 
@@ -1650,8 +1673,8 @@ static AVCodecContext* getCodecContext(AVFormatContext *ic, AVMediaType codec_ty
 
 static enum AVCodecID getCodecId(AVFormatContext *ic, AVMediaType codec_type)
 {
-    AVCodecContext *avctx = getCodecContext(ic, codec_type);
-    return avctx == NULL ? AV_CODEC_ID_NONE : avctx->codec_id;
+    AVCodecParameters *avpar = getCodecParameters(ic, codec_type);
+    return avpar == NULL ? AV_CODEC_ID_NONE : avpar->codec_id;
 }
 
 static bool hasAudioCodecOnly(AVFormatContext *ic)
@@ -1918,8 +1941,8 @@ static void adjustContainerIfNeeded(const char **mime, AVFormatContext *ic)
     const char *newMime = *mime;
     enum AVCodecID codec_id = AV_CODEC_ID_NONE;
 
-    AVCodecContext *avctx = getCodecContext(ic, AVMEDIA_TYPE_VIDEO);
-    if (avctx != NULL && getDivXVersion(avctx) >= 0) {
+    AVCodecParameters *avpar = getCodecParameters(ic, AVMEDIA_TYPE_VIDEO);
+    if (avpar != NULL && getDivXVersion(avpar) >= 0) {
         newMime = MEDIA_MIMETYPE_VIDEO_DIVX;
 
     } else if (hasAudioCodecOnly(ic)) {
@@ -2047,11 +2070,11 @@ static const char *SniffFFMPEGCommon(const char *url, float *confidence, bool is
     // figure out the components.
     for (unsigned int i = 0; i < ic->nb_streams; i++) {
         AVStream* stream = ic->streams[i];
-        if (!stream->codec || !stream->codec->codec_id) {
+        if (!stream->codecpar || !stream->codecpar->codec_id) {
             needProbe = true;
             break;
         }
-        ALOGV("found stream %d id %d codec %s", i, stream->codec->codec_id, avcodec_get_name(stream->codec->codec_id));
+        ALOGV("found stream %d id %d codec %s", i, stream->codecpar->codec_id, avcodec_get_name(stream->codecpar->codec_id));
     }
 
     // We must go deeper.

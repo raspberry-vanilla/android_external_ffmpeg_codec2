@@ -83,52 +83,52 @@ static sp<ABuffer> MakeMPEGVideoESDS(const sp<ABuffer> &csd) {
 //http://msdn.microsoft.com/en-us/library/dd757808(v=vs.85).aspx
 
 // H.264 bitstream without start codes.
-media_status_t setAVCFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setAVCFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("AVC");
 
-    CHECK_GT(avctx->extradata_size, 0);
-    CHECK_EQ((int)avctx->extradata[0], 1); //configurationVersion
+    CHECK_GT(avpar->extradata_size, 0);
+    CHECK_EQ((int)avpar->extradata[0], 1); //configurationVersion
 
-    if (avctx->width == 0 || avctx->height == 0) {
+    if (avpar->width == 0 || avpar->height == 0) {
          int32_t width, height;
-         sp<ABuffer> seqParamSet = new ABuffer(avctx->extradata_size - 8);
-         memcpy(seqParamSet->data(), avctx->extradata + 8, avctx->extradata_size - 8);
+         sp<ABuffer> seqParamSet = new ABuffer(avpar->extradata_size - 8);
+         memcpy(seqParamSet->data(), avpar->extradata + 8, avpar->extradata_size - 8);
          FindAVCDimensions(seqParamSet, &width, &height);
-         avctx->width  = width;
-         avctx->height = height;
+         avpar->width  = width;
+         avpar->height = height;
      }
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_AVC);
-    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_AVC, avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_AVC, avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
 // H.264 bitstream with start codes.
-media_status_t setH264Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setH264Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("H264");
 
-    CHECK_NE((int)avctx->extradata[0], 1); //configurationVersion
+    CHECK_NE((int)avpar->extradata[0], 1); //configurationVersion
 
-    if (!MakeAVCCodecSpecificData(meta, avctx->extradata, avctx->extradata_size))
+    if (!MakeAVCCodecSpecificData(meta, avpar->extradata, avpar->extradata_size))
       return AMEDIA_ERROR_UNKNOWN;
 
     return AMEDIA_OK;
 }
 
-media_status_t setMPEG4Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setMPEG4Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("MPEG4");
 
-    sp<ABuffer> csd = new ABuffer(avctx->extradata_size);
-    memcpy(csd->data(), avctx->extradata, avctx->extradata_size);
+    sp<ABuffer> csd = new ABuffer(avpar->extradata_size);
+    memcpy(csd->data(), avpar->extradata, avpar->extradata_size);
     sp<ABuffer> esds = MakeMPEGVideoESDS(csd);
 
     AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_ESDS, esds->data(), esds->size());
 
-    int divxVersion = getDivXVersion(avctx);
+    int divxVersion = getDivXVersion(avpar);
     if (divxVersion >= 0) {
         AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_DIVX);
         AMediaFormat_setInt32(meta, "divx-version", divxVersion);
@@ -138,7 +138,7 @@ media_status_t setMPEG4Format(AVCodecContext *avctx, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setH263Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setH263Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("H263");
 
@@ -147,12 +147,12 @@ media_status_t setH263Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setMPEG2VIDEOFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setMPEG2VIDEOFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
-    ALOGV("MPEG%uVIDEO", avctx->codec_id == AV_CODEC_ID_MPEG2VIDEO ? 2 : 1);
+    ALOGV("MPEG%uVIDEO", avpar->codec_id == AV_CODEC_ID_MPEG2VIDEO ? 2 : 1);
 
-    sp<ABuffer> csd = new ABuffer(avctx->extradata_size);
-    memcpy(csd->data(), avctx->extradata, avctx->extradata_size);
+    sp<ABuffer> csd = new ABuffer(avpar->extradata_size);
+    memcpy(csd->data(), avpar->extradata, avpar->extradata_size);
     sp<ABuffer> esds = MakeMPEGVideoESDS(csd);
 
     AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_ESDS, esds->data(), esds->size());
@@ -161,17 +161,17 @@ media_status_t setMPEG2VIDEOFormat(AVCodecContext *avctx, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setVC1Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setVC1Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("VC1");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_VC1);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setWMV1Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setWMV1Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("WMV1");
 
@@ -181,82 +181,82 @@ media_status_t setWMV1Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setWMV2Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setWMV2Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("WMV2");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_WMV);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "wmv-version", kTypeWMVVer_8);
 
     return AMEDIA_OK;
 }
 
-media_status_t setWMV3Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setWMV3Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("WMV3");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_WMV);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "wmv-version", kTypeWMVVer_9);
 
     return AMEDIA_OK;
 }
 
-media_status_t setRV20Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setRV20Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("RV20");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_RV);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "rv-version", kTypeRVVer_G2); //http://en.wikipedia.org/wiki/RealVide
 
     return AMEDIA_OK;
 }
 
-media_status_t setRV30Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setRV30Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("RV30");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_RV);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "rv-version", kTypeRVVer_8); //http://en.wikipedia.org/wiki/RealVide
 
     return AMEDIA_OK;
 }
 
-media_status_t setRV40Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setRV40Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("RV40");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_RV);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "rv-version", kTypeRVVer_9); //http://en.wikipedia.org/wiki/RealVide
 
     return AMEDIA_OK;
 }
 
-media_status_t setFLV1Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setFLV1Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("FLV1(Sorenson H263)");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_FLV1);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setHEVCFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setHEVCFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("HEVC");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_VIDEO_HEVC);
-    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_HEVC, avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, AMEDIAFORMAT_KEY_CSD_HEVC, avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setVP8Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setVP8Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("VP8");
 
@@ -265,7 +265,7 @@ media_status_t setVP8Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setVP9Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setVP9Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("VP9");
 
@@ -276,7 +276,7 @@ media_status_t setVP9Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
 
 //audio
 
-media_status_t setMP2Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setMP2Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("MP2");
 
@@ -285,7 +285,7 @@ media_status_t setMP2Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setMP3Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setMP3Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("MP3");
 
@@ -294,14 +294,14 @@ media_status_t setMP3Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setVORBISFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setVORBISFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("VORBIS");
 
     const uint8_t *header_start[3];
     int header_len[3];
-    if (avpriv_split_xiph_headers(avctx->extradata,
-                avctx->extradata_size, 30,
+    if (avpriv_split_xiph_headers(avpar->extradata,
+                avpar->extradata_size, 30,
                 header_start, header_len) < 0) {
         ALOGE("vorbis extradata corrupt.");
         return AMEDIA_ERROR_UNKNOWN;
@@ -316,7 +316,7 @@ media_status_t setVORBISFormat(AVCodecContext *avctx, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setAC3Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
+media_status_t setAC3Format(AVCodecParameters *avpar __unused, AMediaFormat *meta)
 {
     ALOGV("AC3");
 
@@ -325,114 +325,114 @@ media_status_t setAC3Format(AVCodecContext *avctx __unused, AMediaFormat *meta)
     return AMEDIA_OK;
 }
 
-media_status_t setAACFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setAACFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("AAC");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_AAC);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
-    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_AAC_PROFILE, avctx->profile + 1);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
+    AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_AAC_PROFILE, avpar->profile + 1);
 
     return AMEDIA_OK;
 }
 
-media_status_t setWMAV1Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setWMAV1Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("WMAV1");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_WMA);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "wma-version", kTypeWMA); //FIXME version?
 
     return AMEDIA_OK;
 }
 
-media_status_t setWMAV2Format(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setWMAV2Format(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("WMAV2");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_WMA);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "wma-version", kTypeWMA); //FIXME version?
 
     return AMEDIA_OK;
 }
 
-media_status_t setWMAProFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setWMAProFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("WMAPro");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_WMA);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "wma-version", kTypeWMAPro);
 
     return AMEDIA_OK;
 }
 
-media_status_t setWMALossLessFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setWMALossLessFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("WMALOSSLESS");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_WMA);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
     AMediaFormat_setInt32(meta, "wma-version", kTypeWMALossLess);
 
     return AMEDIA_OK;
 }
 
-media_status_t setRAFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setRAFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("COOK");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_RA);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setALACFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setALACFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("ALAC");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_ALAC);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setAPEFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setAPEFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("APE");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_APE);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setDTSFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setDTSFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("DTS");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_DTS);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
     return AMEDIA_OK;
 }
 
-media_status_t setFLACFormat(AVCodecContext *avctx, AMediaFormat *meta)
+media_status_t setFLACFormat(AVCodecParameters *avpar, AMediaFormat *meta)
 {
     ALOGV("FLAC");
 
     AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FLAC);
-    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avctx->extradata, avctx->extradata_size);
+    AMediaFormat_setBuffer(meta, "raw-codec-specific-data", avpar->extradata, avpar->extradata_size);
 
-    if (avctx->extradata_size < 10) {
-        ALOGE("Invalid extradata in FLAC file! (size=%d)", avctx->extradata_size);
+    if (avpar->extradata_size < 10) {
+        ALOGE("Invalid extradata in FLAC file! (size=%d)", avpar->extradata_size);
         return AMEDIA_ERROR_UNKNOWN;
     }
 
-    ABitReader br(avctx->extradata, avctx->extradata_size);
+    ABitReader br(avpar->extradata, avpar->extradata_size);
     int32_t minBlockSize = br.getBits(16);
     int32_t maxBlockSize = br.getBits(16);
     int32_t minFrameSize = br.getBits(24);
@@ -482,20 +482,20 @@ media_status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
     return status;
 }
 
-int getDivXVersion(AVCodecContext *avctx)
+int getDivXVersion(AVCodecParameters *avpar)
 {
-    if (avctx->codec_tag == AV_RL32("DIV3")
-            || avctx->codec_tag == AV_RL32("div3")
-            || avctx->codec_tag == AV_RL32("DIV4")
-            || avctx->codec_tag == AV_RL32("div4")) {
+    if (avpar->codec_tag == AV_RL32("DIV3")
+            || avpar->codec_tag == AV_RL32("div3")
+            || avpar->codec_tag == AV_RL32("DIV4")
+            || avpar->codec_tag == AV_RL32("div4")) {
         return kTypeDivXVer_3_11;
     }
-    if (avctx->codec_tag == AV_RL32("DIVX")
-            || avctx->codec_tag == AV_RL32("divx")) {
+    if (avpar->codec_tag == AV_RL32("DIVX")
+            || avpar->codec_tag == AV_RL32("divx")) {
         return kTypeDivXVer_4;
     }
-    if (avctx->codec_tag == AV_RL32("DX50")
-           || avctx->codec_tag == AV_RL32("dx50")) {
+    if (avpar->codec_tag == AV_RL32("DX50")
+           || avpar->codec_tag == AV_RL32("dx50")) {
         return kTypeDivXVer_5;
     }
     return -1;
@@ -545,13 +545,13 @@ media_status_t parseMetadataTags(AVFormatContext *ctx, AMediaFormat *meta) {
     // now look for album art- this will be in a separate stream
     for (size_t i = 0; i < ctx->nb_streams; i++) {
         if (ctx->streams[i]->disposition & AV_DISPOSITION_ATTACHED_PIC) {
-            AVPacket pkt = ctx->streams[i]->attached_pic;
+            AVPacket& pkt = ctx->streams[i]->attached_pic;
             if (pkt.size > 0) {
-                if (ctx->streams[i]->codec != NULL) {
+                if (ctx->streams[i]->codecpar != NULL) {
                     const char *mime;
-                    if (ctx->streams[i]->codec->codec_id == AV_CODEC_ID_MJPEG) {
+                    if (ctx->streams[i]->codecpar->codec_id == AV_CODEC_ID_MJPEG) {
                         mime = MEDIA_MIMETYPE_IMAGE_JPEG;
-                    } else if (ctx->streams[i]->codec->codec_id == AV_CODEC_ID_PNG) {
+                    } else if (ctx->streams[i]->codecpar->codec_id == AV_CODEC_ID_PNG) {
                         mime = "image/png";
                     } else {
                         mime = NULL;

@@ -62,8 +62,8 @@ void deInitFFmpeg();
 //////////////////////////////////////////////////////////////////////////////////
 // parser
 //////////////////////////////////////////////////////////////////////////////////
-int is_extradata_compatible_with_android(AVCodecContext *avctx);
-int parser_split(AVCodecContext *avctx, const uint8_t *buf, int buf_size);
+int is_extradata_compatible_with_android(AVCodecParameters *avpar);
+int parser_split(AVCodecParameters *avpar, const uint8_t *buf, int buf_size);
 
 //////////////////////////////////////////////////////////////////////////////////
 // packet queue
@@ -82,13 +82,14 @@ typedef struct PacketQueue {
 
 void packet_queue_init(PacketQueue *q);
 void packet_queue_destroy(PacketQueue *q);
-void packet_queue_flush(PacketQueue *q);
+void packet_queue_flush(PacketQueue *q, bool with_flushpacket = false);
 void packet_queue_start(PacketQueue *q);
 void packet_queue_abort(PacketQueue *q);
 int packet_queue_is_wait_for_data(PacketQueue *q);
 int packet_queue_put(PacketQueue *q, AVPacket *pkt);
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index);
 int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block);
+bool packet_queue_is_flushpacket(PacketQueue *q, AVPacket *pkt);
 
 //////////////////////////////////////////////////////////////////////////////////
 // misc

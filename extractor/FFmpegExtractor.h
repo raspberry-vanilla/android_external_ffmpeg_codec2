@@ -104,8 +104,8 @@ private:
     AVStream *mAudioStream;
     bool mDefersToCreateVideoTrack;
     bool mDefersToCreateAudioTrack;
-    AVBitStreamFilterContext *mVideoBsfc;
-    AVBitStreamFilterContext *mAudioBsfc;
+    AVBSFContext *mVideoBsfc;
+    AVBSFContext *mAudioBsfc;
 
     static int decode_interrupt_cb(void *ctx);
     int initStreams();
@@ -122,7 +122,7 @@ private:
     void reachedEOS(enum AVMediaType media_type);
     int stream_seek(int64_t pos, enum AVMediaType media_type,
             MediaTrackHelper::ReadOptions::SeekMode mode);
-    int check_extradata(AVCodecContext *avctx);
+    int check_extradata(AVCodecParameters *avpar);
 
     bool mReaderThreadStarted;
     pthread_t mReaderThread;

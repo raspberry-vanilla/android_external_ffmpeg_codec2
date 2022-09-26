@@ -21,7 +21,6 @@ include external/$(AV_CODEC_LIB)/android/$(AV_CODEC_LIB).mk
 
 # Some flags to work with FFMEG headers.
 LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
-LOCAL_CFLAGS += -Wno-deprecated-declarations
 
 # All modules are installed on /vendor and optional.
 LOCAL_PROPRIETARY_MODULE := true

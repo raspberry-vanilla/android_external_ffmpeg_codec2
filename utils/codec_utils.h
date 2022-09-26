@@ -32,43 +32,43 @@ struct AMediaFormat;
 namespace android {
 
 //video
-media_status_t setAVCFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setH264Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setMPEG4Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setH263Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setMPEG2VIDEOFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setVC1Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMV1Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMV2Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMV3Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setRV20Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setRV30Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setRV40Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setFLV1Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setHEVCFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setVP8Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setVP9Format(AVCodecContext *avctx, AMediaFormat *meta);
+media_status_t setAVCFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setH264Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setMPEG4Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setH263Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setMPEG2VIDEOFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setVC1Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMV1Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMV2Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMV3Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setRV20Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setRV30Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setRV40Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setFLV1Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setHEVCFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setVP8Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setVP9Format(AVCodecParameters *avpar, AMediaFormat *meta);
 //audio
-media_status_t setMP2Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setMP3Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setVORBISFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setAC3Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setAACFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMAV1Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMAV2Format(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMAProFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setWMALossLessFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setRAFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setAPEFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setDTSFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setFLACFormat(AVCodecContext *avctx, AMediaFormat *meta);
-media_status_t setALACFormat(AVCodecContext *avctx, AMediaFormat *meta);
+media_status_t setMP2Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setMP3Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setVORBISFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setAC3Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setAACFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMAV1Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMAV2Format(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMAProFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setWMALossLessFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setRAFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setAPEFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setDTSFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setFLACFormat(AVCodecParameters *avpar, AMediaFormat *meta);
+media_status_t setALACFormat(AVCodecParameters *avpar, AMediaFormat *meta);
 
 //Convert H.264 NAL format to annex b
 media_status_t convertNal2AnnexB(uint8_t *dst, size_t dst_size,
         uint8_t *src, size_t src_size, size_t nal_len_size);
 
-int getDivXVersion(AVCodecContext *avctx);
+int getDivXVersion(AVCodecParameters *avpar);
 
 media_status_t parseMetadataTags(AVFormatContext *ctx, AMediaFormat *meta);
 

@@ -237,7 +237,7 @@ void deInitFFmpeg()
 // parser
 //////////////////////////////////////////////////////////////////////////////////
 /* H.264 bitstream with start codes, NOT AVC1! */
-static int h264_split(AVCodecContext *avctx __unused,
+static int h264_split(AVCodecParameters *avpar __unused,
         const uint8_t *buf, int buf_size, int check_compatible_only)
 {
     int i;
@@ -273,7 +273,7 @@ static int h264_split(AVCodecContext *avctx __unused,
     return 0;
 }
 
-static int mpegvideo_split(AVCodecContext *avctx __unused,
+static int mpegvideo_split(AVCodecParameters *avpar __unused,
         const uint8_t *buf, int buf_size, int check_compatible_only __unused)
 {
     int i;
@@ -291,42 +291,42 @@ static int mpegvideo_split(AVCodecContext *avctx __unused,
 }
 
 /* split extradata from buf for Android OMXCodec */
-int parser_split(AVCodecContext *avctx,
+int parser_split(AVCodecParameters *avpar,
         const uint8_t *buf, int buf_size)
 {
-    if (!avctx || !buf || buf_size <= 0) {
+    if (!avpar || !buf || buf_size <= 0) {
         ALOGE("parser split, valid params");
         return 0;
     }
 
-    if (avctx->codec_id == AV_CODEC_ID_H264) {
-        return h264_split(avctx, buf, buf_size, 0);
-    } else if (avctx->codec_id == AV_CODEC_ID_MPEG2VIDEO ||
-            avctx->codec_id == AV_CODEC_ID_MPEG4) {
-        return mpegvideo_split(avctx, buf, buf_size, 0);
+    if (avpar->codec_id == AV_CODEC_ID_H264) {
+        return h264_split(avpar, buf, buf_size, 0);
+    } else if (avpar->codec_id == AV_CODEC_ID_MPEG2VIDEO ||
+            avpar->codec_id == AV_CODEC_ID_MPEG4) {
+        return mpegvideo_split(avpar, buf, buf_size, 0);
     } else {
-        ALOGE("parser split, unsupport the codec, id: 0x%0x", avctx->codec_id);
+        ALOGE("parser split, unsupport the codec, id: 0x%0x", avpar->codec_id);
     }
 
     return 0;
 }
 
-int is_extradata_compatible_with_android(AVCodecContext *avctx)
+int is_extradata_compatible_with_android(AVCodecParameters *avpar)
 {
-    if (avctx->extradata_size <= 0) {
+    if (avpar->extradata_size <= 0) {
         ALOGI("extradata_size <= 0, extradata is not compatible with "
-                "android decoder, the codec id: 0x%0x", avctx->codec_id);
+                "android decoder, the codec id: 0x%0x", avpar->codec_id);
         return 0;
     }
 
-    if (avctx->codec_id == AV_CODEC_ID_H264
-            && avctx->extradata[0] != 1 /* configurationVersion */) {
+    if (avpar->codec_id == AV_CODEC_ID_H264
+            && avpar->extradata[0] != 1 /* configurationVersion */) {
         // SPS + PPS
-        return !!(h264_split(avctx, avctx->extradata,
-                    avctx->extradata_size, 1) > 0);
+        return !!(h264_split(avpar, avpar->extradata,
+                    avpar->extradata_size, 1) > 0);
     } else {
         // default, FIXME
-        return !!(avctx->extradata_size > 0);
+        return !!(avpar->extradata_size > 0);
     }
 }
 
@@ -343,22 +343,7 @@ void packet_queue_destroy(PacketQueue *q)
 {
     packet_queue_abort(q);
     packet_queue_flush(q);
-}
-
-void packet_queue_flush(PacketQueue *q)
-{
-    AVPacketList *pkt, *pkt1;
-
-    Mutex::Autolock autoLock(q->lock);
-    for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
-        pkt1 = pkt->next;
-        av_packet_unref(&pkt->pkt);
-        av_freep(&pkt);
-    }
-    q->last_pkt = NULL;
-    q->first_pkt = NULL;
-    q->nb_packets = 0;
-    q->size = 0;
+    av_packet_unref(&q->flush_pkt);
 }
 
 void packet_queue_abort(PacketQueue *q)
@@ -378,7 +363,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     pkt1 = (AVPacketList *)av_malloc(sizeof(AVPacketList));
     if (!pkt1)
         return -1;
-    pkt1->pkt = *pkt;
+    av_packet_move_ref(&pkt1->pkt, pkt);
     pkt1->next = NULL;
 
     if (!q->last_pkt)
@@ -393,20 +378,19 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     return 0;
 }
 
+static int packet_queue_put_flushpacket_private(PacketQueue *q) {
+    AVPacket pkt1, *pkt = &pkt1;
+    av_packet_ref(pkt, &q->flush_pkt);
+    return packet_queue_put_private(q, pkt);
+}
+
 int packet_queue_put(PacketQueue *q, AVPacket *pkt)
 {
     int ret;
 
-    /* duplicate the packet */
-    if (pkt != &q->flush_pkt && av_dup_packet(pkt) < 0)
-        return -1;
-
     q->lock.lock();
     ret = packet_queue_put_private(q, pkt);
     q->lock.unlock();
-
-    if (pkt != &q->flush_pkt && ret < 0)
-        av_packet_unref(pkt);
 
     return ret;
 }
@@ -415,6 +399,25 @@ int packet_queue_is_wait_for_data(PacketQueue *q)
 {
     Mutex::Autolock autoLock(q->lock);
     return q->wait_for_data;
+}
+
+void packet_queue_flush(PacketQueue *q, bool with_flushpacket)
+{
+    AVPacketList *pkt, *pkt1;
+
+    Mutex::Autolock autoLock(q->lock);
+    for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
+        pkt1 = pkt->next;
+        av_packet_unref(&pkt->pkt);
+        av_freep(&pkt);
+    }
+    q->last_pkt = NULL;
+    q->first_pkt = NULL;
+    q->nb_packets = 0;
+    q->size = 0;
+    if (with_flushpacket) {
+        packet_queue_put_flushpacket_private(q);
+    }
 }
 
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
@@ -445,7 +448,7 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
             q->nb_packets--;
             //q->size -= pkt1->pkt.size + sizeof(*pkt1);
             q->size -= pkt1->pkt.size;
-            *pkt = pkt1->pkt;
+            av_packet_move_ref(pkt, &pkt1->pkt);
             av_free(pkt1);
             ret = 1;
             break;
@@ -464,11 +467,13 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
 void packet_queue_start(PacketQueue *q)
 {
     Mutex::Autolock autoLock(q->lock);
-    av_init_packet(&q->flush_pkt);
-    q->flush_pkt.data = (uint8_t *)&q->flush_pkt;
-    q->flush_pkt.size = 0;
+    av_new_packet(&q->flush_pkt, 0);
     q->abort_request = 0;
-    packet_queue_put_private(q, &q->flush_pkt);
+    packet_queue_put_flushpacket_private(q);
+}
+
+bool packet_queue_is_flushpacket(PacketQueue *q, AVPacket *pkt) {
+    return (q->flush_pkt.data == pkt->data);
 }
 
 //////////////////////////////////////////////////////////////////////////////////
