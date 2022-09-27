@@ -57,17 +57,15 @@ private:
         AMediaFormat *mMeta;
         AVStream *mStream;
         PacketQueue *mQueue;
+        bool mSeek;
     };
 
     Vector<TrackInfo> mTracks;
 
     mutable Mutex mLock;
-    mutable Mutex mExtractorMutex;
-    Condition mCondition;
 
     DataSourceHelper *mDataSource;
     AMediaFormat *mMeta;
-    status_t mInitCheck;
 
     char mFilename[PATH_MAX];
     int mGenPTS;
@@ -75,27 +73,13 @@ private:
     int mAudioDisable;
     int mShowStatus;
     int mSeekByBytes;
-    int mAutoExit;
-    int64_t mStartTime;
     int64_t mDuration;
-    int mLoop;
     bool mEOF;
-    size_t mProbePkts;
-
+    size_t mPktCounter;
     int mAbortRequest;
-    int mPaused;
-    int mLastPaused;
-    int mSeekIdx;
-    MediaTrackHelper::ReadOptions::SeekMode mSeekMode;
-    int64_t mSeekPos;
-    int64_t mSeekMin;
-    int64_t mSeekMax;
 
-    int mReadPauseReturn;
     PacketQueue mAudioQ;
     PacketQueue mVideoQ;
-    bool mVideoEOSReceived;
-    bool mAudioEOSReceived;
 
     AVFormatContext *mFormatCtx;
     int mVideoStreamIdx;
@@ -106,32 +90,25 @@ private:
     bool mDefersToCreateAudioTrack;
     AVBSFContext *mVideoBsfc;
     AVBSFContext *mAudioBsfc;
+    bool mParsedMetadata;
 
-    static int decode_interrupt_cb(void *ctx);
+    static int decodeInterruptCb(void *ctx);
+
     int initStreams();
     void deInitStreams();
     void fetchStuffsFromSniffedMeta(const sp<AMessage> &meta);
     void setFFmpegDefaultOpts();
-    void printTime(int64_t time);
-    bool is_codec_supported(enum AVCodecID codec_id);
+    int feedNextPacket();
+    int getPacket(int trackIndex, AVPacket *pkt);
+    bool isCodecSupported(enum AVCodecID codec_id);
     media_status_t setVideoFormat(AVStream *stream, AMediaFormat *meta);
     media_status_t setAudioFormat(AVStream *stream, AMediaFormat *meta);
     void setDurationMetaData(AVStream *stream, AMediaFormat *meta);
-    int stream_component_open(int stream_index);
-    void stream_component_close(int stream_index);
-    void reachedEOS(enum AVMediaType media_type);
-    int stream_seek(int64_t pos, enum AVMediaType media_type,
-            MediaTrackHelper::ReadOptions::SeekMode mode);
-    int check_extradata(AVCodecParameters *avpar);
-
-    bool mReaderThreadStarted;
-    pthread_t mReaderThread;
-    status_t startReaderThread();
-    void stopReaderThread();
-    static void *ReaderWrapper(void *me);
-    void readerEntry();
-
-    bool mParsedMetadata;
+    int streamComponentOpen(int streamIndex);
+    void streamComponentClose(int streamIndex);
+    int streamSeek(int trackIndex, int64_t pos,
+                    MediaTrackHelper::ReadOptions::SeekMode mode);
+    int checkExtradata(AVCodecParameters *avpar);
 
     DISALLOW_EVIL_CONSTRUCTORS(FFmpegExtractor);
 };

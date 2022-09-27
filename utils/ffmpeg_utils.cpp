@@ -343,7 +343,6 @@ void packet_queue_destroy(PacketQueue *q)
 {
     packet_queue_abort(q);
     packet_queue_flush(q);
-    av_packet_unref(&q->flush_pkt);
 }
 
 void packet_queue_abort(PacketQueue *q)
@@ -378,12 +377,6 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     return 0;
 }
 
-static int packet_queue_put_flushpacket_private(PacketQueue *q) {
-    AVPacket pkt1, *pkt = &pkt1;
-    av_packet_ref(pkt, &q->flush_pkt);
-    return packet_queue_put_private(q, pkt);
-}
-
 int packet_queue_put(PacketQueue *q, AVPacket *pkt)
 {
     int ret;
@@ -401,7 +394,7 @@ int packet_queue_is_wait_for_data(PacketQueue *q)
     return q->wait_for_data;
 }
 
-void packet_queue_flush(PacketQueue *q, bool with_flushpacket)
+void packet_queue_flush(PacketQueue *q)
 {
     AVPacketList *pkt, *pkt1;
 
@@ -415,9 +408,6 @@ void packet_queue_flush(PacketQueue *q, bool with_flushpacket)
     q->first_pkt = NULL;
     q->nb_packets = 0;
     q->size = 0;
-    if (with_flushpacket) {
-        packet_queue_put_flushpacket_private(q);
-    }
 }
 
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
@@ -467,13 +457,7 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
 void packet_queue_start(PacketQueue *q)
 {
     Mutex::Autolock autoLock(q->lock);
-    av_new_packet(&q->flush_pkt, 0);
     q->abort_request = 0;
-    packet_queue_put_flushpacket_private(q);
-}
-
-bool packet_queue_is_flushpacket(PacketQueue *q, AVPacket *pkt) {
-    return (q->flush_pkt.data == pkt->data);
 }
 
 //////////////////////////////////////////////////////////////////////////////////

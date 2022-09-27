@@ -21,6 +21,7 @@
 #include "ffmpeg_source.h"
 
 #include <media/MediaExtractorPluginApi.h>
+#include <media/stagefright/MediaErrors.h>
 
 extern "C" {
 
@@ -55,9 +56,11 @@ int FFSource::read(unsigned char *buf, size_t size)
     ssize_t n = 0;
 
     n = mSource->readAt(mSource->handle, mOffset, buf, size);
-    if (n == UNKNOWN_ERROR) {
-        ALOGE("FFSource readAt failed");
-        return AVERROR(errno);
+    if (n == ERROR_END_OF_STREAM) {
+        return AVERROR_EOF;
+    } else if (n < 0) {
+        ALOGE("FFSource readAt failed (%zd)", n);
+        return n == UNKNOWN_ERROR ? AVERROR(errno) : n;
     }
     if (n > 0) {
         mOffset += n;
