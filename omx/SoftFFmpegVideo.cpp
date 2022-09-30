@@ -53,6 +53,12 @@ static const CodecProfileLevel kHEVCProfileLevels[] = {
     { OMX_VIDEO_HEVCProfileMainStill, OMX_VIDEO_HEVCMainTierLevel51 },
 };
 
+static const CodecProfileLevel kVP9ProfileLevels[] = {
+    // Only need to declare the highest supported profile and level here.
+    { OMX_VIDEO_VP9Profile0, OMX_VIDEO_VP9Level5 },
+    { OMX_VIDEO_VP9Profile2, OMX_VIDEO_VP9Level5 },
+};
+
 SoftFFmpegVideo::SoftFFmpegVideo(
         const char *name,
         const char *componentRole,
@@ -826,6 +832,9 @@ SoftOMXComponent* SoftFFmpegVideo::createSoftOMXComponent(
     } else if (!strcmp(name, "OMX.ffmpeg.hevc.decoder")) {
         codec_profile_levels = kHEVCProfileLevels;
         codec_array_size = ARRAY_SIZE(kHEVCProfileLevels);
+    } else if (!strcmp(name, "OMX.ffmpeg.vp9.decoder")) {
+        codec_profile_levels = kVP9ProfileLevels;
+        codec_array_size = ARRAY_SIZE(kVP9ProfileLevels);
     } else {
         codec_profile_levels = NULL;
         codec_array_size = 0;

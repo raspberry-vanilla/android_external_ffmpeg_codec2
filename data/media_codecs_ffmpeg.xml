@@ -110,13 +110,11 @@
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
-	<!--
-	<MediaCodec name="OMX.ffmpeg.vp9.decoder" type="video/x-vnd.on2.vp9">
+        <MediaCodec name="OMX.ffmpeg.vp9.decoder" type="video/x-vnd.on2.vp9">
             <Limit name="size" min="2x2" max="2048x2048" />
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
-	</MediaCodec>
-	-->
+        </MediaCodec>
         <MediaCodec name="OMX.ffmpeg.rv.decoder"     type="video/vnd.rn-realvideo">
             <Limit name="size" min="2x2" max="2048x2048" />
             <Limit name="alignment" value="2x2" />
