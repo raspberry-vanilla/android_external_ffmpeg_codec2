@@ -141,7 +141,6 @@ status_t SoftFFmpegVideo::initDecoder(enum AVCodecID codecID) {
     mCtx->extradata = NULL;
     mCtx->width = mWidth;
     mCtx->height = mHeight;
-    ffmpeg_hwaccel_init(mCtx);
     ALOGD("%p initDecoder: %p", this, mCtx);
     return OK;
 }
@@ -427,6 +426,7 @@ int32_t SoftFFmpegVideo::openDecoder() {
     }
 
     setDefaultCtx(mCtx, mCtx->codec);
+    ffmpeg_hwaccel_init(mCtx);
 
     ALOGD("begin to open ffmpeg decoder(%s) now",
             avcodec_get_name(mCtx->codec_id));

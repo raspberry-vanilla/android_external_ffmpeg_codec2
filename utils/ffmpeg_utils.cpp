@@ -204,6 +204,8 @@ status_t initFFmpeg()
         /* register android source */
         ffmpeg_register_android_source();
 
+        ALOGI("FFMPEG initialized: %s", av_version_info());
+
         if (av_lockmgr_register(lockmgr)) {
             ALOGE("could not initialize lock manager!");
             ret = NO_INIT;
@@ -228,6 +230,7 @@ void deInitFFmpeg()
     if(s_ref_count == 0) {
         av_lockmgr_register(NULL);
         avformat_network_deinit();
+        ALOGD("FFMPEG deinitialized");
     }
 
     pthread_mutex_unlock(&s_init_mutex);
