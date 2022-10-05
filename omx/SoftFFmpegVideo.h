@@ -84,6 +84,7 @@ private:
     AVCodecContext *mCtx;
     struct SwsContext *mImgConvertCtx;
     AVFrame *mFrame;
+    AVPacket *mPacket;
 
     EOSStatus mEOSStatus;
 

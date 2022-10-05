@@ -67,6 +67,7 @@ SoftFFmpegAudio::SoftFFmpegAudio(
       mCtx(NULL),
       mSwrCtx(NULL),
       mFrame(NULL),
+      mPacket(NULL),
       mEOSStatus(INPUT_DATA_AVAILABLE),
       mSignalledError(false),
       mInputBufferSize(0),
@@ -248,6 +249,10 @@ void SoftFFmpegAudio::deInitDecoder() {
     if (mFrame) {
         av_frame_free(&mFrame);
         mFrame = NULL;
+    }
+    if (mPacket) {
+        av_packet_free(&mPacket);
+        mPacket = NULL;
     }
 #ifdef LIBAV_CONFIG_H
 #else
@@ -1168,9 +1173,6 @@ void SoftFFmpegAudio::updateTimeStamp(OMX_BUFFERHEADERTYPE *inHeader) {
 
 void SoftFFmpegAudio::initPacket(AVPacket *pkt,
         OMX_BUFFERHEADERTYPE *inHeader) {
-    memset(pkt, 0, sizeof(AVPacket));
-    av_init_packet(pkt);
-
     if (inHeader) {
         pkt->data = (uint8_t *)inHeader->pBuffer + inHeader->nOffset;
         pkt->size = inHeader->nFilledLen;
@@ -1220,11 +1222,17 @@ int32_t SoftFFmpegAudio::decodeAudio() {
         return ERR_FLUSHED;
     }
 
-    AVPacket pkt;
-    initPacket(&pkt, inHeader);
+    if (!mPacket) {
+        mPacket = av_packet_alloc();
+        if (!mPacket) {
+            ALOGE("oom for audio packet");
+            return ERR_OOM;
+        }
+    }
 
-    len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, &pkt);
-    av_packet_unref(&pkt);
+    initPacket(mPacket, inHeader);
+    len = avcodec_decode_audio4(mCtx, mFrame, &gotFrm, mPacket);
+    av_packet_unref(mPacket);
 
     //a negative error code is returned if an error occurred during decoding
     if (len < 0) {

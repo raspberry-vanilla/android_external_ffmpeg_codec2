@@ -103,6 +103,7 @@ private:
     AVCodecContext *mCtx;
     struct SwrContext *mSwrCtx;
     AVFrame *mFrame;
+    AVPacket *mPacket;
 
     uint8_t *mVorbisHeaderStart[3];
     int mVorbisHeaderLen[3];

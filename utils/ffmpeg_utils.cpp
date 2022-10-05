@@ -151,26 +151,6 @@ const struct { const char *name; int level; } log_levels[] = {
 //////////////////////////////////////////////////////////////////////////////////
 // constructor and destructor
 //////////////////////////////////////////////////////////////////////////////////
-/* Mutex manager callback. */
-static int lockmgr(void **mtx, enum AVLockOp op)
-{
-    switch (op) {
-    case AV_LOCK_CREATE:
-        *mtx = (void *)av_malloc(sizeof(pthread_mutex_t));
-        if (!*mtx)
-            return 1;
-        return !!pthread_mutex_init((pthread_mutex_t *)(*mtx), NULL);
-    case AV_LOCK_OBTAIN:
-        return !!pthread_mutex_lock((pthread_mutex_t *)(*mtx));
-    case AV_LOCK_RELEASE:
-        return !!pthread_mutex_unlock((pthread_mutex_t *)(*mtx));
-    case AV_LOCK_DESTROY:
-        pthread_mutex_destroy((pthread_mutex_t *)(*mtx));
-        av_freep(mtx);
-        return 0;
-    }
-    return 1;
-}
 
 /**
  * To debug ffmpeg", type this command on the console before starting playback:
@@ -193,23 +173,13 @@ status_t initFFmpeg()
         nam_av_log_set_flags(AV_LOG_SKIP_REPEATED);
         av_log_set_callback(nam_av_log_callback);
 
-        /* register all codecs, demux and protocols */
-        avcodec_register_all();
-#if 0
-        avdevice_register_all();
-#endif
-        av_register_all();
+        /* global ffmpeg initialization */
         avformat_network_init();
 
         /* register android source */
         ffmpeg_register_android_source();
 
         ALOGI("FFMPEG initialized: %s", av_version_info());
-
-        if (av_lockmgr_register(lockmgr)) {
-            ALOGE("could not initialize lock manager!");
-            ret = NO_INIT;
-        }
     }
 
     // update counter
@@ -228,7 +198,6 @@ void deInitFFmpeg()
     s_ref_count--;
 
     if(s_ref_count == 0) {
-        av_lockmgr_register(NULL);
         avformat_network_deinit();
         ALOGD("FFMPEG deinitialized");
     }
@@ -336,16 +305,37 @@ int is_extradata_compatible_with_android(AVCodecParameters *avpar)
 //////////////////////////////////////////////////////////////////////////////////
 // packet queue
 //////////////////////////////////////////////////////////////////////////////////
-void packet_queue_init(PacketQueue *q)
+
+typedef struct PacketList {
+    AVPacket *pkt;
+    struct PacketList *next;
+} PacketList;
+
+typedef struct PacketQueue {
+    PacketList *first_pkt, *last_pkt;
+    int nb_packets;
+    int size;
+    int wait_for_data;
+    int abort_request;
+    Mutex lock;
+    Condition cond;
+} PacketQueue;
+
+PacketQueue* packet_queue_alloc()
 {
-    memset(q, 0, sizeof(PacketQueue));
-    q->abort_request = 1;
+    PacketQueue *queue = (PacketQueue*)av_mallocz(sizeof(PacketQueue));
+    if (queue) {
+        queue->abort_request = 1;
+        return queue;
+    }
+    return NULL;
 }
 
-void packet_queue_destroy(PacketQueue *q)
+void packet_queue_free(PacketQueue **q)
 {
-    packet_queue_abort(q);
-    packet_queue_flush(q);
+    packet_queue_abort(*q);
+    packet_queue_flush(*q);
+    av_freep(q);
 }
 
 void packet_queue_abort(PacketQueue *q)
@@ -357,15 +347,20 @@ void packet_queue_abort(PacketQueue *q)
 
 static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
 {
-    AVPacketList *pkt1;
+    PacketList *pkt1;
 
     if (q->abort_request)
         return -1;
 
-    pkt1 = (AVPacketList *)av_malloc(sizeof(AVPacketList));
+    pkt1 = (PacketList *)av_malloc(sizeof(PacketList));
     if (!pkt1)
         return -1;
-    av_packet_move_ref(&pkt1->pkt, pkt);
+    pkt1->pkt = av_packet_alloc();
+    if (!pkt1->pkt) {
+        av_free(pkt1);
+        return -1;
+    }
+    av_packet_move_ref(pkt1->pkt, pkt);
     pkt1->next = NULL;
 
     if (!q->last_pkt)
@@ -375,7 +370,7 @@ static int packet_queue_put_private(PacketQueue *q, AVPacket *pkt)
     q->last_pkt = pkt1;
     q->nb_packets++;
     //q->size += pkt1->pkt.size + sizeof(*pkt1);
-    q->size += pkt1->pkt.size;
+    q->size += pkt1->pkt->size;
     q->cond.signal();
     return 0;
 }
@@ -399,12 +394,12 @@ int packet_queue_is_wait_for_data(PacketQueue *q)
 
 void packet_queue_flush(PacketQueue *q)
 {
-    AVPacketList *pkt, *pkt1;
+    PacketList *pkt, *pkt1;
 
     Mutex::Autolock autoLock(q->lock);
     for (pkt = q->first_pkt; pkt != NULL; pkt = pkt1) {
         pkt1 = pkt->next;
-        av_packet_unref(&pkt->pkt);
+        av_packet_free(&pkt->pkt);
         av_freep(&pkt);
     }
     q->last_pkt = NULL;
@@ -415,19 +410,24 @@ void packet_queue_flush(PacketQueue *q)
 
 int packet_queue_put_nullpacket(PacketQueue *q, int stream_index)
 {
-    AVPacket pkt1, *pkt = &pkt1;
-    av_init_packet(pkt);
+    AVPacket *pkt;
+    int err;
+
+    pkt = av_packet_alloc();
     pkt->data = NULL;
     pkt->size = 0;
     pkt->stream_index = stream_index;
-    return packet_queue_put(q, pkt);
+    err = packet_queue_put(q, pkt);
+    av_packet_free(&pkt);
+
+    return err;
 }
 
 /* packet queue handling */
 /* return < 0 if aborted, 0 if no packet and > 0 if packet.  */
 int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
 {
-    AVPacketList *pkt1;
+    PacketList *pkt1;
     int ret = -1;
 
     Mutex::Autolock autoLock(q->lock);
@@ -440,8 +440,9 @@ int packet_queue_get(PacketQueue *q, AVPacket *pkt, int block)
                 q->last_pkt = NULL;
             q->nb_packets--;
             //q->size -= pkt1->pkt.size + sizeof(*pkt1);
-            q->size -= pkt1->pkt.size;
-            av_packet_move_ref(pkt, &pkt1->pkt);
+            q->size -= pkt1->pkt->size;
+            av_packet_move_ref(pkt, pkt1->pkt);
+            av_packet_free(&pkt1->pkt);
             av_free(pkt1);
             ret = 1;
             break;

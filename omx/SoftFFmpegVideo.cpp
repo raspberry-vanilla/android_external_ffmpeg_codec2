@@ -77,6 +77,7 @@ SoftFFmpegVideo::SoftFFmpegVideo(
       mCtx(NULL),
       mImgConvertCtx(NULL),
       mFrame(NULL),
+      mPacket(NULL),
       mEOSStatus(INPUT_DATA_AVAILABLE),
       mExtradataReady(false),
       mIgnoreExtradata(false),
@@ -166,6 +167,10 @@ void SoftFFmpegVideo::deInitDecoder() {
     if (mFrame) {
         av_frame_free(&mFrame);
         mFrame = NULL;
+    }
+    if (mPacket) {
+        av_packet_free(&mPacket);
+        mPacket = NULL;
     }
     if (mImgConvertCtx) {
         sws_freeContext(mImgConvertCtx);
@@ -452,9 +457,6 @@ int32_t SoftFFmpegVideo::openDecoder() {
 
 void SoftFFmpegVideo::initPacket(AVPacket *pkt,
         OMX_BUFFERHEADERTYPE *inHeader) {
-    memset(pkt, 0, sizeof(AVPacket));
-    av_init_packet(pkt);
-
     if (inHeader) {
         pkt->data = (uint8_t *)inHeader->pBuffer + inHeader->nOffset;
         pkt->size = inHeader->nFilledLen;
@@ -496,11 +498,17 @@ int32_t SoftFFmpegVideo::decodeVideo() {
         return ERR_FLUSHED;
     }
 
-    AVPacket pkt;
-    initPacket(&pkt, inHeader);
+    if (!mPacket) {
+        mPacket = av_packet_alloc();
+        if (!mPacket) {
+            ALOGE("oom for video packet");
+            return ERR_OOM;
+        }
+    }
 
-    err = avcodec_decode_video2(mCtx, mFrame, &gotPic, &pkt);
-    av_packet_unref(&pkt);
+    initPacket(mPacket, inHeader);
+    err = avcodec_decode_video2(mCtx, mFrame, &gotPic, mPacket);
+    av_packet_unref(mPacket);
 
     if (err < 0) {
         ALOGE("ffmpeg video decoder failed to decode frame. (%d)", err);

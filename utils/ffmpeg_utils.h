@@ -69,18 +69,10 @@ int parser_split(AVCodecParameters *avpar, const uint8_t *buf, int buf_size);
 // packet queue
 //////////////////////////////////////////////////////////////////////////////////
 
-typedef struct PacketQueue {
-    AVPacketList *first_pkt, *last_pkt;
-    int nb_packets;
-    int size;
-    int wait_for_data;
-    int abort_request;
-    Mutex lock;
-    Condition cond;
-} PacketQueue;
+typedef struct PacketQueue PacketQueue;
 
-void packet_queue_init(PacketQueue *q);
-void packet_queue_destroy(PacketQueue *q);
+PacketQueue* packet_queue_alloc();
+void packet_queue_free(PacketQueue **q);
 void packet_queue_flush(PacketQueue *q);
 void packet_queue_start(PacketQueue *q);
 void packet_queue_abort(PacketQueue *q);
