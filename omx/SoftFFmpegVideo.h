@@ -110,7 +110,6 @@ private:
     int32_t  openDecoder();
     void     initPacket(AVPacket *pkt, OMX_BUFFERHEADERTYPE *inHeader);
     int32_t  decodeVideo();
-    int32_t  preProcessVideoFrame(AVPicture *picture, void **bufp);
     int32_t  drainOneOutputBuffer();
     void     drainEOSOutputBuffer();
     void     drainAllOutputBuffers();

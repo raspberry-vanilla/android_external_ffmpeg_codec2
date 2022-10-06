@@ -128,8 +128,6 @@ private:
     uint32_t mAudioTgtFreq;
     uint32_t mAudioSrcChannels;
     uint32_t mAudioTgtChannels;
-    int64_t mAudioSrcChannelLayout;
-    int64_t mAudioTgtChannelLayout;
     enum AVSampleFormat mAudioSrcFmt;
     enum AVSampleFormat mAudioTgtFmt;
 

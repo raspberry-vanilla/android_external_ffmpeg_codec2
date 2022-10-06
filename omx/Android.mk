@@ -2,8 +2,6 @@ LOCAL_PATH := $(call my-dir)
 
 include $(SF_COMMON_MK)
 
-LOCAL_CFLAGS += -Wno-deprecated-declarations
-
 LOCAL_SRC_FILES := \
 	FFmpegOMXPlugin.cpp \
 	SoftFFmpegAudio.cpp \

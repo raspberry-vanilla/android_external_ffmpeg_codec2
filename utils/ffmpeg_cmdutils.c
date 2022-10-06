@@ -4,6 +4,7 @@
 #include "libavutil/eval.h"
 #include "libavutil/log.h"
 #include "libavutil/opt.h"
+#include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
 
 /*
@@ -61,8 +62,8 @@ AVDictionary *filter_codec_opts(AVDictionary *opts, enum AVCodecID codec_id,
     const AVClass    *cc = avcodec_get_class();
 
     if (!codec)
-        codec            = s->oformat ? avcodec_find_encoder(codec_id)
-                                      : avcodec_find_decoder(codec_id);
+        codec = (AVCodec*)(s->oformat ? avcodec_find_encoder(codec_id)
+                                      : avcodec_find_decoder(codec_id));
 
     switch (st->codecpar->codec_type) {
     case AVMEDIA_TYPE_VIDEO:

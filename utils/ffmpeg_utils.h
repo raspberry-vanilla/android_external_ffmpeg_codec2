@@ -31,6 +31,7 @@ extern "C" {
 #include "config.h"
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
+#include "libavcodec/bsf.h"
 #include "libswscale/swscale.h"
 #ifdef LIBAV_CONFIG_H
 #include "libavresample/avresample.h"

@@ -17,16 +17,19 @@
 #define LOG_TAG "FFMPEG"
 #include <utils/Log.h>
 
+#include <inttypes.h>
 #include <stdlib.h>
 #include "ffmpeg_source.h"
 
 #include <media/MediaExtractorPluginApi.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/stagefright/MediaErrors.h>
 
 extern "C" {
 
 #include "config.h"
 #include "libavformat/url.h"
+#include "libavutil/error.h"
 
 }
 
@@ -35,7 +38,8 @@ namespace android {
 class FFSource
 {
 public:
-    void set(CDataSource *s) { mSource = s; }
+    void set(CDataSource *s);
+    void reset();
     int init_check();
     int read(unsigned char *buf, size_t size);
     int64_t seek(int64_t pos);
@@ -44,10 +48,27 @@ public:
 protected:
     CDataSource *mSource;
     int64_t mOffset;
+    uint32_t mFlags;
 };
+
+void FFSource::set(CDataSource *s)
+{
+    mSource = s;
+    mOffset = 0;
+    mFlags = s->flags(s->handle);
+
+    ALOGV("FFSource[%p]: flags=%08x", mSource, mFlags);
+}
+
+void FFSource::reset()
+{
+    ALOGV("FFSource[%p]: reset", mSource);
+    mSource = NULL;
+}
 
 int FFSource::init_check()
 {
+    ALOGV("FFSource[%p]: init_check", mSource);
     return 0;
 }
 
@@ -56,13 +77,17 @@ int FFSource::read(unsigned char *buf, size_t size)
     ssize_t n = 0;
 
     n = mSource->readAt(mSource->handle, mOffset, buf, size);
-    if (n == ERROR_END_OF_STREAM) {
+    if (n == ERROR_END_OF_STREAM ||
+            // For local file source, 0 bytes read means EOS.
+            (n == 0 && (mFlags & DataSourceBase::kIsLocalFileSource) != 0)) {
+        ALOGV("FFSource[%p]: end-of-stream", mSource);
         return AVERROR_EOF;
     } else if (n < 0) {
-        ALOGE("FFSource readAt failed (%zd)", n);
+        ALOGE("FFSource[%p]: readAt failed (%zu)", mSource, n);
         return n == UNKNOWN_ERROR ? AVERROR(errno) : n;
     }
     if (n > 0) {
+        ALOGV("FFsource[%p]: read = %zd", mSource, n);
         mOffset += n;
     }
 
@@ -71,6 +96,7 @@ int FFSource::read(unsigned char *buf, size_t size)
 
 int64_t FFSource::seek(int64_t pos)
 {
+    ALOGV("FFSource[%p]: seek = %" PRId64, mSource, pos);
     mOffset = pos;
     return 0;
 }
@@ -80,9 +106,10 @@ off64_t FFSource::getSize()
     off64_t sz = -1;
 
     if (mSource->getSize(mSource->handle, &sz) != OK) {
-         ALOGE("FFSource getSize failed");
+         ALOGE("FFSource[%p] getSize failed", mSource);
          return AVERROR(errno);
     }
+    ALOGV("FFsource[%p] size = %" PRId64, mSource, sz);
 
     return sz;
 }
@@ -164,7 +191,7 @@ static int64_t android_seek(URLContext *h, int64_t pos, int whence)
 static int android_close(URLContext *h)
 {
     ALOGV("android source close");
-    reinterpret_cast<FFSource *>(h->priv_data)->set(NULL);
+    reinterpret_cast<FFSource *>(h->priv_data)->reset();
     return 0;
 }
 

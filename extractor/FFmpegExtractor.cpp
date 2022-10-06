@@ -558,11 +558,11 @@ media_status_t FFmpegExtractor::setAudioFormat(AVStream *stream, AMediaFormat *m
         ALOGD("[audio] bit_rate: %" PRId64 ", sample_rate: %d, channels: %d, "
                 "bits_per_coded_sample: %d, block_align: %d "
                 "bits_per_raw_sample: %d, sample_format: %d",
-                avpar->bit_rate, avpar->sample_rate, avpar->channels,
+                avpar->bit_rate, avpar->sample_rate, avpar->ch_layout.nb_channels,
                 avpar->bits_per_coded_sample, avpar->block_align,
                 avpar->bits_per_raw_sample, avpar->format);
 
-        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, avpar->channels);
+        AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, avpar->ch_layout.nb_channels);
         AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_BIT_RATE, avpar->bit_rate);
         int32_t bits = avpar->bits_per_raw_sample > 0 ?
                 avpar->bits_per_raw_sample :
@@ -1132,11 +1132,11 @@ int FFmpegExtractor::feedNextPacket() {
                 return ret;
             }
             if (mDefersToCreateAudioTrack && avpar->extradata_size <= 0) {
-                int new_extradata_size = 0;
+                size_t new_extradata_size = 0;
                 uint8_t* new_extradata = av_packet_get_side_data(pkt, AV_PKT_DATA_NEW_EXTRADATA, &new_extradata_size);
 
                 if (new_extradata_size > 0) {
-                    ALOGV("[audio::%s] extradata found, len=%d", mAudioBsfc->filter->name, new_extradata_size);
+                    ALOGV("[audio::%s] extradata found, len=%zd", mAudioBsfc->filter->name, new_extradata_size);
                     avpar->extradata = (uint8_t*)av_mallocz(new_extradata_size + AV_INPUT_BUFFER_PADDING_SIZE);
                     if (avpar->extradata) {
                         memcpy(avpar->extradata, new_extradata, new_extradata_size);

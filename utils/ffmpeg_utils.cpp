@@ -152,22 +152,47 @@ const struct { const char *name; int level; } log_levels[] = {
 // constructor and destructor
 //////////////////////////////////////////////////////////////////////////////////
 
+static int parseLogLevel(const char* s) {
+    if (strcmp(s, "quiet") == 0)
+        return AV_LOG_QUIET;
+    else if (strcmp(s, "panic") == 0)
+        return AV_LOG_PANIC;
+    else if (strcmp(s, "fatal") == 0)
+        return AV_LOG_FATAL;
+    else if (strcmp(s, "error") == 0)
+        return AV_LOG_ERROR;
+    else if (strcmp(s, "warning") == 0)
+        return AV_LOG_WARNING;
+    else if (strcmp(s, "info") == 0)
+        return AV_LOG_INFO;
+    else if (strcmp(s, "verbose") == 0)
+        return AV_LOG_VERBOSE;
+    else if (strcmp(s, "debug") == 0)
+        return AV_LOG_DEBUG;
+    else if (strcmp(s, "trace") == 0)
+        return AV_LOG_TRACE;
+    else {
+        ALOGE("unsupported loglevel: %s", s);
+        return AV_LOG_INFO;
+    }
+}
+
 /**
- * To debug ffmpeg", type this command on the console before starting playback:
- *     setprop debug.nam.ffmpeg 1
- * To disable the debug, type:
- *     setprop debug.nam.ffmpge 0
+ * To set ffmpeg log level, type this command on the console before starting playback:
+ *     setprop debug.ffmpeg.loglevel [quiet|panic|fatal|error|warning|info|verbose|debug|trace]
 */
 status_t initFFmpeg() 
 {
     status_t ret = OK;
+    char pval[PROPERTY_VALUE_MAX];
 
     pthread_mutex_lock(&s_init_mutex);
 
-    if (property_get_bool("debug.nam.ffmpeg", 0))
-        av_log_set_level(AV_LOG_DEBUG);
-    else
+    if (property_get("debug.ffmpeg.loglevel", pval, "info")) {
+        av_log_set_level(parseLogLevel(pval));
+    } else {
         av_log_set_level(AV_LOG_INFO);
+    }
 
     if(s_ref_count == 0) {
         nam_av_log_set_flags(AV_LOG_SKIP_REPEATED);
