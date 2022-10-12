@@ -263,6 +263,7 @@ c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuff
     uint8_t* data[4];
     int linesize[4];
     C2PlanarLayout layout = outBuffer->layout();
+    struct SwsContext* currentImgConvertCtx = mImgConvertCtx;
 
     data[0] = outBuffer->data()[C2PlanarLayout::PLANE_Y];
     data[1] = outBuffer->data()[C2PlanarLayout::PLANE_U];
@@ -271,16 +272,21 @@ c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuff
     linesize[1] = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
     linesize[2] = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
-    mImgConvertCtx = sws_getCachedContext(mImgConvertCtx,
+    mImgConvertCtx = sws_getCachedContext(currentImgConvertCtx,
            mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format,
            mFrame->width, mFrame->height, AV_PIX_FMT_YUV420P,
            SWS_BICUBIC, NULL, NULL, NULL);
-    if (! mImgConvertCtx) {
+    if (mImgConvertCtx && mImgConvertCtx != currentImgConvertCtx) {
+        ALOGD("getOutputBuffer: created video converter - %s => %s",
+              av_get_pix_fmt_name((AVPixelFormat)mFrame->format), av_get_pix_fmt_name(AV_PIX_FMT_YUV420P));
+
+    } else if (! mImgConvertCtx) {
         ALOGE("getOutputBuffer: cannot initialize the conversion context");
         return C2_NO_MEMORY;
     }
+
     sws_scale(mImgConvertCtx, mFrame->data, mFrame->linesize,
-            0, mFrame->height, data, linesize);
+              0, mFrame->height, data, linesize);
 
     return C2_OK;
 }
@@ -464,8 +470,8 @@ c2_status_t C2FFMPEGVideoDecodeComponent::outputFrame(
                                   { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
 
     if (err != C2_OK) {
-        ALOGE("outputFrame: failed to fetch graphic block %d x %x (%x) err = %d",
-              mFrame->width, mFrame->height, format, err);
+        ALOGE("outputFrame: failed to fetch graphic block %d x %d (%x) err = %d",
+              mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12, err);
         return C2_CORRUPTED;
     }
 

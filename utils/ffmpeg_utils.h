@@ -39,6 +39,7 @@ extern "C" {
 #include "libswresample/swresample.h"
 #endif
 #include "libavutil/opt.h"
+#include "libavutil/pixdesc.h"
 
 #include <system/audio.h>
 

@@ -155,29 +155,37 @@ public:
 
     virtual std::vector<std::shared_ptr<const C2Component::Traits>>
             listComponents() override {
-        ALOGD("listComponents");
         std::vector<std::shared_ptr<const C2Component::Traits>> ret;
         // FIXME: Prefer OMX codecs for the time being...
         uint32_t defaultRank = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank", 0x110u);
         uint32_t defaultRankAudio = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.audio", defaultRank);
         uint32_t defaultRankVideo = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.video", defaultRank);
-        for (int i = 0; i < kNumAudioComponents; i++) {
-            auto traits = std::make_shared<C2Component::Traits>();
-            traits->name = kFFMPEGAudioComponents[i].name;
-            traits->domain = C2Component::DOMAIN_AUDIO;
-            traits->kind = C2Component::KIND_DECODER;
-            traits->mediaType = kFFMPEGAudioComponents[i].mediaType;
-            traits->rank = defaultRankAudio;
-            ret.push_back(traits);
-        }
-        for (int i = 0; i < kNumVideoComponents; i++) {
-            auto traits = std::make_shared<C2Component::Traits>();
-            traits->name = kFFMPEGVideoComponents[i].name;
-            traits->domain = C2Component::DOMAIN_VIDEO;
-            traits->kind = C2Component::KIND_DECODER;
-            traits->mediaType = kFFMPEGVideoComponents[i].mediaType;
-            traits->rank = defaultRankVideo;
-            ret.push_back(traits);
+        ALOGD("listComponents: defaultRank=%x, defaultRankAudio=%x, defaultRankVideo=%x",
+              defaultRank, defaultRankAudio, defaultRankVideo);
+#define RANK_DISABLED 0xFFFFFFFF
+        if (defaultRank != RANK_DISABLED) {
+            if (defaultRankAudio != RANK_DISABLED) {
+                for (int i = 0; i < kNumAudioComponents; i++) {
+                    auto traits = std::make_shared<C2Component::Traits>();
+                    traits->name = kFFMPEGAudioComponents[i].name;
+                    traits->domain = C2Component::DOMAIN_AUDIO;
+                    traits->kind = C2Component::KIND_DECODER;
+                    traits->mediaType = kFFMPEGAudioComponents[i].mediaType;
+                    traits->rank = defaultRankAudio;
+                    ret.push_back(traits);
+                }
+            }
+            if (defaultRankVideo != RANK_DISABLED) {
+                for (int i = 0; i < kNumVideoComponents; i++) {
+                    auto traits = std::make_shared<C2Component::Traits>();
+                    traits->name = kFFMPEGVideoComponents[i].name;
+                    traits->domain = C2Component::DOMAIN_VIDEO;
+                    traits->kind = C2Component::KIND_DECODER;
+                    traits->mediaType = kFFMPEGVideoComponents[i].mediaType;
+                    traits->rank = defaultRankVideo;
+                    ret.push_back(traits);
+                }
+            }
         }
         return ret;
     }

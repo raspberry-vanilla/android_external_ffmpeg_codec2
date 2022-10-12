@@ -70,6 +70,32 @@ int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
         return AVERROR(ENOMEM);
     }
 
+    // The frame transfer from GPU uses 2 different methods:
+    // 1. Map hw-frame to YV12
+    //    This method maps the GPU buffer into a linear buffer in system
+    //    memory. Because the Intel GPU uses Y-tiled for decoding, this
+    //    requires internal conversion (detiling), which slows down the
+    //    process. However the mapped system memory is not copied, which
+    //    makes it faster than next method.
+    // 2. Transfer hw-frame to YV12
+    //    This method does the same as the previous one, but also copy the
+    //    mapped memory into FFMPEG-owned buffers. This additional copy makes
+    //    it the slowest. This would typically not be used, as method 2
+    //    would be successful (and if it fails, then method 3 will also
+    //    likely fail).
+
+    // YUV420P mapping (slower)
+
+    output->format = AV_PIX_FMT_YUV420P;
+
+    err = av_hwframe_map(output, frame, AV_HWFRAME_MAP_READ);
+    if (err == 0) {
+        goto finish;
+    }
+    av_frame_unref(output);
+
+    // HW frame download (slowest)
+
     output->format = AV_PIX_FMT_YUV420P;
 
     err = av_hwframe_transfer_data(output, frame, 0);
@@ -78,7 +104,9 @@ int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
               av_err2str(err), err);
         goto fail;
     }
+    goto finish;
 
+finish:
     err = av_frame_copy_props(output, frame);
     if (err < 0) {
         ALOGE("ffmpeg_hwaccel_get_frame failed to copy frame properties: %s (%08x)",

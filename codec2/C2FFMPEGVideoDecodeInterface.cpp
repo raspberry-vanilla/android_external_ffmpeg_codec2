@@ -212,6 +212,14 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
             .withFields({C2F(mRawCodecData, m.value)})
             .withSetter(CodecSetter)
             .build());
+
+    addParameter(
+            DefineParam(mConsumerUsage, C2_PARAMKEY_OUTPUT_STREAM_USAGE)
+            .withDefault(new C2StreamUsageTuning::output(
+                                0u, GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER))
+            .withFields({C2F(mConsumerUsage, value).any()})
+            .withSetter(Setter<decltype(*mConsumerUsage)>::StrictValueWithNoDeps)
+            .build());
 }
 
 C2R C2FFMPEGVideoDecodeInterface::SizeSetter(

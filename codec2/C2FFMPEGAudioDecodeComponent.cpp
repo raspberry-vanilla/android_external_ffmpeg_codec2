@@ -586,7 +586,7 @@ void C2FFMPEGAudioDecodeComponent::process(
 #if DEBUG_FRAMES
             ALOGD("process: got frame pts=%" PRId64 " dts=%" PRId64 " ts=%" PRId64 " - sr=%d, ch=%d, fmt=%s, #=%d",
                   mFrame->pts, mFrame->pkt_dts, mFrame->best_effort_timestamp,
-                  mFrame->sample_rate, mFrame->channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
+                  mFrame->sample_rate, mFrame->ch_layout.nb_channels, av_get_sample_fmt_name((enum AVSampleFormat)mFrame->format),
                   mFrame->nb_samples);
 #endif
             // Always target the sample format on output port. Even if we can trigger a config update
@@ -670,7 +670,7 @@ void C2FFMPEGAudioDecodeComponent::process(
                     clone->worklets.front()->output.buffers.clear();
                     clone->worklets.front()->output.buffers.push_back(buffer);
                     clone->worklets.front()->output.ordinal = clone->input.ordinal;
-                    if (mFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
+                    if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
                         work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
                     }
                     clone->worklets.front()->output.flags = C2FrameData::FLAG_INCOMPLETE;
@@ -686,7 +686,7 @@ void C2FFMPEGAudioDecodeComponent::process(
             }
             else {
                 work->worklets.front()->output.buffers.push_back(buffer);
-                if (mFrame->best_effort_timestamp == AV_NOPTS_VALUE) {
+                if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
                     work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
                 }
                 break;
