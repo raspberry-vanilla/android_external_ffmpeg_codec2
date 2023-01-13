@@ -98,7 +98,13 @@ c2_status_t C2FFMPEGVideoDecodeComponent::openDecoder() {
     mExtradataReady = true;
 
     // Find decoder again as codec_id may have changed.
-    mCtx->codec = avcodec_find_decoder(mCtx->codec_id);
+    if (mCtx->codec_id == AV_CODEC_ID_H264 &&
+            base::GetBoolProperty("persist.ffmpeg_codec2.v4l2.h264", false)) {
+        mCtx->codec = avcodec_find_decoder_by_name("h264_v4l2m2m");
+    } else {
+        mCtx->codec = avcodec_find_decoder(mCtx->codec_id);
+    }
+
     if (! mCtx->codec) {
         ALOGE("openDecoder: ffmpeg video decoder failed to find codec %d", mCtx->codec_id);
         return C2_NOT_FOUND;
