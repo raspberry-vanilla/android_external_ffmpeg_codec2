@@ -8,7 +8,7 @@
 #include "libavutil/opt.h"
 
 int ffmpeg_hwaccel_init(AVCodecContext *avctx) {
-    if (!property_get_bool("media.sf.hwaccel", 0))
+    if (avctx->codec_id != AV_CODEC_ID_HEVC || !property_get_bool("persist.ffmpeg_codec2.v4l2.h265", 0))
         return 0;
 
     // Find codec information. At this point, AVCodecContext.codec may not be
@@ -28,7 +28,7 @@ int ffmpeg_hwaccel_init(AVCodecContext *avctx) {
         }
 
         // Try to initialize HW device.
-        if (av_hwdevice_ctx_create(&avctx->hw_device_ctx, config->device_type, "android", NULL, 0) < 0) {
+        if (av_hwdevice_ctx_create(&avctx->hw_device_ctx, config->device_type, NULL, NULL, 0) < 0) {
             // Initialization failed, skip this HW config.
             ALOGD_IF(DEBUG_HWACCEL, "ffmpeg_hwaccel_init: failed to initialize HW device %s",
                      av_hwdevice_get_type_name(config->device_type));
