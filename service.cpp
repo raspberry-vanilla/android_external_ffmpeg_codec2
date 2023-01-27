@@ -146,9 +146,9 @@ public:
             listComponents() override {
         std::vector<std::shared_ptr<const C2Component::Traits>> ret;
         // FIXME: Prefer OMX codecs for the time being...
-        uint32_t defaultRank = ::android::base::GetUintProperty("debug.ffmpeg_codec2.rank", 0x110u);
-        uint32_t defaultRankAudio = ::android::base::GetUintProperty("debug.ffmpeg_codec2.rank.audio", defaultRank);
-        uint32_t defaultRankVideo = ::android::base::GetUintProperty("debug.ffmpeg_codec2.rank.video", defaultRank);
+        uint32_t defaultRank = ::android::base::GetUintProperty("persist.ffmpeg_codec2.rank", 0x110u);
+        uint32_t defaultRankAudio = ::android::base::GetUintProperty("persist.ffmpeg_codec2.rank.audio", defaultRank);
+        uint32_t defaultRankVideo = ::android::base::GetUintProperty("persist.ffmpeg_codec2.rank.video", defaultRank);
         ALOGD("listComponents: defaultRank=%x, defaultRankAudio=%x, defaultRankVideo=%x",
               defaultRank, defaultRankAudio, defaultRankVideo);
 #define RANK_DISABLED 0xFFFFFFFF
