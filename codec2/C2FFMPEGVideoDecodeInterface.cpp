@@ -207,13 +207,6 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
             .build());
 
     addParameter(
-            DefineParam(mRawCodecData, C2_PARAMKEY_RAW_CODEC_DATA)
-            .withDefault(C2StreamRawCodecDataInfo::input::AllocShared(0, 0u))
-            .withFields({C2F(mRawCodecData, m.value)})
-            .withSetter(CodecSetter)
-            .build());
-
-    addParameter(
             DefineParam(mConsumerUsage, C2_PARAMKEY_OUTPUT_STREAM_USAGE)
             .withDefault(new C2StreamUsageTuning::output(
                                 0u, GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER))
@@ -245,18 +238,6 @@ C2R C2FFMPEGVideoDecodeInterface::ProfileLevelSetter(
         C2P<C2StreamProfileLevelInfo::input>& /* me */,
         const C2P<C2StreamPictureSizeInfo::output>& /* size */) {
     return C2R::Ok();
-}
-
-C2R C2FFMPEGVideoDecodeInterface::CodecSetter(
-        bool mayBlock __unused, C2P<C2StreamRawCodecDataInfo::input>& me __unused) {
-    return C2R::Ok();
-}
-
-const FFMPEGVideoCodecInfo* C2FFMPEGVideoDecodeInterface::getCodecInfo() const {
-    if (mRawCodecData->flexCount() == sizeof(FFMPEGVideoCodecInfo)) {
-        return (const FFMPEGVideoCodecInfo*)mRawCodecData->m.value;
-    }
-    return nullptr;
 }
 
 } // namespace android

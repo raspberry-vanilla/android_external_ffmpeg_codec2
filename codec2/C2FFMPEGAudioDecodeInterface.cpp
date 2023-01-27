@@ -92,25 +92,6 @@ C2FFMPEGAudioDecodeInterface::C2FFMPEGAudioDecodeInterface(
                 .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 32768))
                 .build());
     }
-
-    addParameter(
-            DefineParam(mRawCodecData, C2_PARAMKEY_RAW_CODEC_DATA)
-            .withDefault(C2StreamRawCodecDataInfo::input::AllocShared(0, 0u))
-            .withFields({C2F(mRawCodecData, m.value)})
-            .withSetter(CodecSetter)
-            .build());
-}
-
-C2R C2FFMPEGAudioDecodeInterface::CodecSetter(
-        bool mayBlock __unused, C2P<C2StreamRawCodecDataInfo::input>& me __unused) {
-    return C2R::Ok();
-}
-
-const FFMPEGAudioCodecInfo* C2FFMPEGAudioDecodeInterface::getCodecInfo() const {
-    if (mRawCodecData->flexCount() == sizeof(FFMPEGAudioCodecInfo)) {
-        return (const FFMPEGAudioCodecInfo*)mRawCodecData->m.value;
-    }
-    return nullptr;
 }
 
 } // namespace android

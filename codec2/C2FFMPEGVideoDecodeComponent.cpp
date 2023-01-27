@@ -80,13 +80,6 @@ c2_status_t C2FFMPEGVideoDecodeComponent::initDecoder() {
     mCtx->width = size.width;
     mCtx->height = size.height;
 
-    const FFMPEGVideoCodecInfo* codecInfo = mIntf->getCodecInfo();
-
-    if (codecInfo) {
-        ALOGD("initDecoder: use codec info from extractor");
-        mCtx->codec_id = (enum AVCodecID)codecInfo->codec_id;
-    }
-
     ALOGD("initDecoder: %p [%s], %d x %d, %s",
           mCtx, avcodec_get_name(mCtx->codec_id), size.width, size.height, mInfo->mediaType);
 

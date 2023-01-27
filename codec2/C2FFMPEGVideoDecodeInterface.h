@@ -19,7 +19,6 @@
 
 #include <SimpleC2Interface.h>
 #include "C2FFMPEGCommon.h"
-#include "codec_utils.h"
 
 namespace android {
 
@@ -31,7 +30,6 @@ public:
 
     uint32_t getWidth() const { return mSize->width; }
     uint32_t getHeight() const { return mSize->height; }
-    const FFMPEGVideoCodecInfo* getCodecInfo() const;
     uint64_t getConsumerUsage() const { return mConsumerUsage->value; }
     const std::shared_ptr<C2StreamPixelFormatInfo::output>&
         getPixelFormatInfo() const { return mPixelFormat; }
@@ -46,15 +44,12 @@ private:
         bool mayBlock,
         C2P<C2StreamProfileLevelInfo::input> &me,
         const C2P<C2StreamPictureSizeInfo::output> &size);
-    static C2R CodecSetter(
-        bool mayBlock, C2P<C2StreamRawCodecDataInfo::input>& me);
 
 private:
     std::shared_ptr<C2StreamPictureSizeInfo::output> mSize;
     std::shared_ptr<C2StreamProfileLevelInfo::input> mProfileLevel;
     std::shared_ptr<C2StreamColorInfo::output> mColorInfo;
     std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
-    std::shared_ptr<C2StreamRawCodecDataInfo::input> mRawCodecData;
     std::shared_ptr<C2StreamUsageTuning::output> mConsumerUsage;
 };
 

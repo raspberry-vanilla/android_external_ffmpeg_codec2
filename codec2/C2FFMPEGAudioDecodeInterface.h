@@ -19,7 +19,6 @@
 
 #include <SimpleC2Interface.h>
 #include "C2FFMPEGCommon.h"
-#include "codec_utils.h"
 
 namespace android {
 
@@ -33,11 +32,6 @@ public:
     uint32_t getChannelCount() const { return mChannelCount->value; }
     uint32_t getBitrate() const { return mBitrate->value; }
     C2Config::pcm_encoding_t getPcmEncodingInfo() const { return mPcmEncodingInfo->value; }
-    const FFMPEGAudioCodecInfo* getCodecInfo() const;
-
-private:
-    static C2R CodecSetter(
-        bool mayBlock, C2P<C2StreamRawCodecDataInfo::input>& me);
 
 private:
     std::shared_ptr<C2StreamSampleRateInfo::output> mSampleRate;
@@ -45,7 +39,6 @@ private:
     std::shared_ptr<C2StreamBitrateInfo::input> mBitrate;
     std::shared_ptr<C2StreamPcmEncodingInfo::output> mPcmEncodingInfo;
     std::shared_ptr<C2StreamMaxBufferSizeInfo::input> mInputMaxBufSize;
-    std::shared_ptr<C2StreamRawCodecDataInfo::input> mRawCodecData;
 };
 
 } // namespace android

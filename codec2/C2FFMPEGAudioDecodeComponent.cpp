@@ -247,17 +247,6 @@ c2_status_t C2FFMPEGAudioDecodeComponent::initDecoder() {
     // Avoid resampling if possible, ask the codec for the target format.
     mCtx->request_sample_fmt = mCtx->sample_fmt;
 
-    const FFMPEGAudioCodecInfo* codecInfo = mIntf->getCodecInfo();
-
-    if (codecInfo) {
-        ALOGD("initDecoder: use codec info from extractor");
-        mCtx->codec_id = (enum AVCodecID)codecInfo->codec_id;
-        mCtx->bit_rate = mIntf->getBitrate(); // The extractor always sets bitrate
-        mCtx->bits_per_coded_sample = codecInfo->bits_per_coded_sample;
-        mCtx->block_align = codecInfo->block_align;
-        // FIXME: Is more needed...?
-    }
-
     mCodecHelper = createCodecHelper(mCtx->codec_id);
 
     ALOGD("initDecoder: %p [%s], %s - sr=%d, ch=%d, fmt=%s",
