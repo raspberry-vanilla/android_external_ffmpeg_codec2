@@ -76,6 +76,7 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := media_codecs_ffmpeg_c2.xml
 LOCAL_MODULE_TAGS := optional
 LOCAL_MODULE_CLASS := ETC
+LOCAL_PROPRIETARY_MODULE := true
 LOCAL_SRC_FILES := media_codecs_ffmpeg_c2.xml
 include $(BUILD_PREBUILT)
 
