@@ -49,19 +49,13 @@ static constexpr char kExtSeccompPolicyPath[] =
         "android.hardware.media.c2@1.2-ffmpeg-extended.policy";
 
 static const C2FFMPEGComponentInfo kFFMPEGVideoComponents[] = {
-    { "c2.ffmpeg.divx.decoder"  , MEDIA_MIMETYPE_VIDEO_DIVX  , AV_CODEC_ID_MPEG4      },
-    { "c2.ffmpeg.flv1.decoder"  , MEDIA_MIMETYPE_VIDEO_FLV1  , AV_CODEC_ID_FLV1       },
     { "c2.ffmpeg.h263.decoder"  , MEDIA_MIMETYPE_VIDEO_H263  , AV_CODEC_ID_H263       },
     { "c2.ffmpeg.hevc.decoder"  , MEDIA_MIMETYPE_VIDEO_HEVC  , AV_CODEC_ID_HEVC       },
     { "c2.ffmpeg.h264.decoder"  , MEDIA_MIMETYPE_VIDEO_AVC   , AV_CODEC_ID_H264       },
     { "c2.ffmpeg.mpeg2.decoder" , MEDIA_MIMETYPE_VIDEO_MPEG2 , AV_CODEC_ID_MPEG2VIDEO },
     { "c2.ffmpeg.mpeg4.decoder" , MEDIA_MIMETYPE_VIDEO_MPEG4 , AV_CODEC_ID_MPEG4      },
-    { "c2.ffmpeg.rv.decoder"    , MEDIA_MIMETYPE_VIDEO_RV    , AV_CODEC_ID_RV40       },
-    { "c2.ffmpeg.vc1.decoder"   , MEDIA_MIMETYPE_VIDEO_VC1   , AV_CODEC_ID_VC1        },
     { "c2.ffmpeg.vp8.decoder"   , MEDIA_MIMETYPE_VIDEO_VP8   , AV_CODEC_ID_VP8        },
     { "c2.ffmpeg.vp9.decoder"   , MEDIA_MIMETYPE_VIDEO_VP9   , AV_CODEC_ID_VP9        },
-    { "c2.ffmpeg.vtrial.decoder", MEDIA_MIMETYPE_VIDEO_FFMPEG, AV_CODEC_ID_NONE       },
-    { "c2.ffmpeg.wmv.decoder"   , MEDIA_MIMETYPE_VIDEO_WMV   , AV_CODEC_ID_WMV2       },
 };
 
 static const size_t kNumVideoComponents =
@@ -71,15 +65,10 @@ static const C2FFMPEGComponentInfo kFFMPEGAudioComponents[] = {
     { "c2.ffmpeg.aac.decoder"   , MEDIA_MIMETYPE_AUDIO_AAC          , AV_CODEC_ID_AAC    },
     { "c2.ffmpeg.ac3.decoder"   , MEDIA_MIMETYPE_AUDIO_AC3          , AV_CODEC_ID_AC3    },
     { "c2.ffmpeg.alac.decoder"  , MEDIA_MIMETYPE_AUDIO_ALAC         , AV_CODEC_ID_ALAC   },
-    { "c2.ffmpeg.ape.decoder"   , MEDIA_MIMETYPE_AUDIO_APE          , AV_CODEC_ID_APE    },
-    { "c2.ffmpeg.atrial.decoder", MEDIA_MIMETYPE_AUDIO_FFMPEG       , AV_CODEC_ID_NONE   },
-    { "c2.ffmpeg.dts.decoder"   , MEDIA_MIMETYPE_AUDIO_DTS          , AV_CODEC_ID_DTS    },
     { "c2.ffmpeg.flac.decoder"  , MEDIA_MIMETYPE_AUDIO_FLAC         , AV_CODEC_ID_FLAC   },
     { "c2.ffmpeg.mp2.decoder"   , MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II, AV_CODEC_ID_MP2    },
     { "c2.ffmpeg.mp3.decoder"   , MEDIA_MIMETYPE_AUDIO_MPEG         , AV_CODEC_ID_MP3    },
-    { "c2.ffmpeg.ra.decoder"    , MEDIA_MIMETYPE_AUDIO_RA           , AV_CODEC_ID_COOK   },
     { "c2.ffmpeg.vorbis.decoder", MEDIA_MIMETYPE_AUDIO_VORBIS       , AV_CODEC_ID_VORBIS },
-    { "c2.ffmpeg.wma.decoder"   , MEDIA_MIMETYPE_AUDIO_WMA          , AV_CODEC_ID_WMAV2  },
 };
 
 static const size_t kNumAudioComponents =

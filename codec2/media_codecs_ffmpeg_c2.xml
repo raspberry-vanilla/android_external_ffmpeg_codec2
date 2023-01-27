@@ -32,23 +32,6 @@
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000-192000" />
         </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.ape.decoder"    type="audio/x-ape" >
-            <Alias name="OMX.ffmpeg.ape.decoder" />
-            <Limit name="channel-count" max="8" />
-            <Limit name="sample-rate" ranges="8000-192000" />
-        </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.atrial.decoder" type="audio/ffmpeg" >
-            <Alias name="OMX.ffmpeg.atrial.decoder" />
-            <Limit name="channel-count" max="8" />
-            <Limit name="sample-rate" ranges="8000-192000" />
-        </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.dts.decoder">
-            <Alias name="OMX.ffmpeg.dts.decoder" />
-            <Type name="audio/vnd.dts" />
-            <Type name="audio/dts" />
-            <Limit name="channel-count" max="8" />
-            <Limit name="sample-rate" ranges="8000-192000" />
-        </MediaCodec>
         <MediaCodec name="c2.ffmpeg.flac.decoder"   type="audio/flac" >
             <Alias name="OMX.ffmpeg.flac.decoder" />
             <Limit name="channel-count" max="8" />
@@ -64,35 +47,13 @@
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000-192000" />
         </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.ra.decoder"     type="audio/vnd.rn-realaudio" >
-            <Alias name="OMX.ffmpeg.ra.decoder" />
-            <Limit name="channel-count" max="8" />
-            <Limit name="sample-rate" ranges="8000-192000" />
-        </MediaCodec>
         <MediaCodec name="c2.ffmpeg.vorbis.decoder" type="audio/vorbis" >
             <Alias name="OMX.ffmpeg.vorbisac3.decoder" />
             <Limit name="channel-count" max="8" />
             <Limit name="sample-rate" ranges="8000-192000" />
         </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.wma.decoder"    type="audio/x-ms-wma" >
-            <Alias name="OMX.ffmpeg.wma.decoder" />
-            <Limit name="channel-count" max="8" />
-            <Limit name="sample-rate" ranges="8000-192000" />
-        </MediaCodec>
 
         <!-- video codecs -->
-        <MediaCodec name="c2.ffmpeg.divx.decoder"   type="video/divx">
-            <Alias name="OMX.ffmpeg.divx.decoder" />
-            <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
-            <Feature name="adaptive-playback" />
-        </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.flv1.decoder"   type="video/x-flv">
-            <Alias name="OMX.ffmpeg.flv1.decoder" />
-            <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
-            <Feature name="adaptive-playback" />
-        </MediaCodec>
         <MediaCodec name="c2.ffmpeg.h263.decoder"   type="video/3gpp">
             <Alias name="OMX.ffmpeg.h263.decoder" />
             <Limit name="size" min="2x2" max="2048x2048" />
@@ -123,18 +84,6 @@
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
         </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.rv.decoder"     type="video/vnd.rn-realvideo">
-            <Alias name="OMX.ffmpeg.rv.decoder" />
-            <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
-            <Feature name="adaptive-playback" />
-        </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.vc1.decoder"    type="video/vc1">
-            <Alias name="OMX.ffmpeg.vc1.decoder" />
-            <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
-            <Feature name="adaptive-playback" />
-        </MediaCodec>
         <MediaCodec name="c2.ffmpeg.vp8.decoder"    type="video/x-vnd.on2.vp8">
             <Alias name="OMX.ffmpeg.vp8.decoder" />
             <Limit name="size" min="2x2" max="2048x2048" />
@@ -143,18 +92,6 @@
         </MediaCodec>
         <MediaCodec name="c2.ffmpeg.vp9.decoder"    type="video/x-vnd.on2.vp9">
             <Alias name="OMX.ffmpeg.vp9.decoder" />
-            <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
-            <Feature name="adaptive-playback" />
-        </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.vtrial.decoder" type="video/ffmpeg">
-            <Alias name="OMX.ffmpeg.vtrial.decoder" />
-            <Limit name="size" min="2x2" max="2048x2048" />
-            <Limit name="alignment" value="2x2" />
-            <Feature name="adaptive-playback" />
-        </MediaCodec>
-        <MediaCodec name="c2.ffmpeg.wmv.decoder"    type="video/x-ms-wmv">
-            <Alias name="OMX.ffmpeg.wmv.decoder" />
             <Limit name="size" min="2x2" max="2048x2048" />
             <Limit name="alignment" value="2x2" />
             <Feature name="adaptive-playback" />
