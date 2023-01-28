@@ -1,5 +1,6 @@
 #
 # Copyright (C) 2017 The Android-x86 Open Source Project
+# Copyright (C) 2023 KonstaKANG
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,14 +15,32 @@
 # limitations under the License.
 #
 
+LOCAL_PATH := $(call my-dir)
+
 include $(CLEAR_VARS)
 
 # Include base FFMPEG definitions.
-include external/$(AV_CODEC_LIB)/android/$(AV_CODEC_LIB).mk
+include external/ffmpeg/android/ffmpeg.mk
 
-# Some flags to work with FFMEG headers.
-LOCAL_CFLAGS += -D__STDC_CONSTANT_MACROS=1 -D__STDINT_LIMITS=1
-
-# All modules are installed on /vendor and optional.
+LOCAL_MODULE := libffmpeg_utils
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_TAGS := optional
+
+LOCAL_SRC_FILES := \
+    ffmpeg_hwaccel.c \
+    ffmpeg_utils.cpp
+
+LOCAL_SHARED_LIBRARIES += \
+    libavcodec \
+    libavformat \
+    libavutil \
+    libcutils \
+    liblog \
+    libstagefright_foundation \
+    libswresample \
+    libswscale \
+    libutils
+
+LOCAL_EXPORT_C_INCLUDE_DIRS := $(LOCAL_PATH)
+
+include $(BUILD_SHARED_LIBRARY)
