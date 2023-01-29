@@ -111,9 +111,9 @@ c2_status_t C2FFMPEGVideoDecodeComponent::openDecoder() {
     mCtx->skip_idct         = AVDISCARD_DEFAULT;
     mCtx->skip_loop_filter  = AVDISCARD_DEFAULT;
     mCtx->error_concealment = 3;
-    mCtx->thread_count      = base::GetIntProperty("debug.ffmpeg-codec2.threads", 0);
+    mCtx->thread_count      = base::GetIntProperty("debug.ffmpeg_codec2.threads", 0);
 
-    if (base::GetBoolProperty("debug.ffmpeg-codec2.fast", false)) {
+    if (base::GetBoolProperty("debug.ffmpeg_codec2.fast", false)) {
         mCtx->flags2 |= AV_CODEC_FLAG2_FAST;
     }
 

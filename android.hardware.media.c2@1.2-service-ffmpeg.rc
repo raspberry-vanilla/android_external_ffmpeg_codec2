@@ -14,7 +14,7 @@
 # limitations under the License.
 #
 
-service android-hardware-media-c2-hal-1-2 /vendor/bin/hw/android.hardware.media.c2@1.2-ffmpeg-service
+service android-hardware-media-c2-ffmpeg-hal-1-2 /vendor/bin/hw/android.hardware.media.c2@1.2-service-ffmpeg
     class hal
     user mediacodec
     group camera mediadrm drmrpc

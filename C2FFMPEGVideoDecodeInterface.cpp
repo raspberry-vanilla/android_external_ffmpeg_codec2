@@ -146,7 +146,7 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
     }
 
     else {
-        int nthreads = base::GetIntProperty("debug.ffmpeg-codec2.threads", 0);
+        int nthreads = base::GetIntProperty("debug.ffmpeg_codec2.threads", 0);
 
         if (nthreads <= 0) {
             nthreads = std::thread::hardware_concurrency();

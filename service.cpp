@@ -15,7 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "android.hardware.media.c2@1.2-service"
+#define LOG_TAG "android.hardware.media.c2@1.2-service-ffmpeg"
 
 #include <android-base/logging.h>
 #include <android-base/properties.h>
@@ -146,9 +146,9 @@ public:
             listComponents() override {
         std::vector<std::shared_ptr<const C2Component::Traits>> ret;
         // FIXME: Prefer OMX codecs for the time being...
-        uint32_t defaultRank = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank", 0x110u);
-        uint32_t defaultRankAudio = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.audio", defaultRank);
-        uint32_t defaultRankVideo = ::android::base::GetUintProperty("debug.ffmpeg-codec2.rank.video", defaultRank);
+        uint32_t defaultRank = ::android::base::GetUintProperty("debug.ffmpeg_codec2.rank", 0x110u);
+        uint32_t defaultRankAudio = ::android::base::GetUintProperty("debug.ffmpeg_codec2.rank.audio", defaultRank);
+        uint32_t defaultRankVideo = ::android::base::GetUintProperty("debug.ffmpeg_codec2.rank.video", defaultRank);
         ALOGD("listComponents: defaultRank=%x, defaultRankAudio=%x, defaultRankVideo=%x",
               defaultRank, defaultRankAudio, defaultRankVideo);
 #define RANK_DISABLED 0xFFFFFFFF
@@ -276,7 +276,7 @@ private:
 
 int main(int /* argc */, char** /* argv */) {
     using namespace ::android;
-    LOG(DEBUG) << "android.hardware.media.c2@1.2-service starting...";
+    LOG(DEBUG) << "android.hardware.media.c2@1.2-service-ffmpeg starting...";
 
     // Set up minijail to limit system calls.
     signal(SIGPIPE, SIG_IGN);

@@ -22,12 +22,12 @@ include $(CLEAR_VARS)
 # Include base FFMPEG definitions.
 include external/ffmpeg/android/ffmpeg.mk
 
-LOCAL_MODULE := android.hardware.media.c2@1.2-ffmpeg-service
+LOCAL_MODULE := android.hardware.media.c2@1.2-service-ffmpeg
 LOCAL_MODULE_TAGS := optional
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_RELATIVE_PATH := hw
-LOCAL_VINTF_FRAGMENTS := manifest_media_c2_V1_2_ffmpeg.xml
-LOCAL_INIT_RC := android.hardware.media.c2@1.2-ffmpeg-service.rc
+LOCAL_VINTF_FRAGMENTS := android.hardware.media.c2@1.2-service-ffmpeg.xml
+LOCAL_INIT_RC := android.hardware.media.c2@1.2-service-ffmpeg.rc
 
 LOCAL_REQUIRED_MODULES := \
     android.hardware.media.c2@1.2-ffmpeg.policy \
