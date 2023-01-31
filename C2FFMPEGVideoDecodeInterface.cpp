@@ -129,6 +129,7 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
                 .withFields({
                     C2F(mProfileLevel, profile).oneOf({
                             C2Config::PROFILE_HEVC_MAIN,
+                            C2Config::PROFILE_HEVC_MAIN_10,
                             C2Config::PROFILE_HEVC_MAIN_STILL}),
                     C2F(mProfileLevel, level).oneOf({
                             C2Config::LEVEL_HEVC_MAIN_1,

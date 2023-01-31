@@ -70,7 +70,7 @@ int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
         return AVERROR(ENOMEM);
     }
 
-    output->format = AV_PIX_FMT_YUV420P;
+    output->format = AV_PIX_FMT_NV12;
 
     err = av_hwframe_transfer_data(output, frame, 0);
     if (err < 0) {
