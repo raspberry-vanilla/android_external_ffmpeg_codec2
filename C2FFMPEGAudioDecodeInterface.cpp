@@ -86,7 +86,8 @@ C2FFMPEGAudioDecodeInterface::C2FFMPEGAudioDecodeInterface(
             .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
             .build());
 
-    if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_AUDIO_WMA) == 0) {
+    if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_AUDIO_WMA) == 0
+        || strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_AUDIO_FLAC) == 0) {
         addParameter(
                 DefineParam(mInputMaxBufSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
                 .withConstValue(new C2StreamMaxBufferSizeInfo::input(0u, 32768))
