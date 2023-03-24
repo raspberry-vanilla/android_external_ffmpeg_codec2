@@ -19,9 +19,6 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-# Include base FFMPEG definitions.
-include external/ffmpeg/android/ffmpeg.mk
-
 LOCAL_MODULE := android.hardware.media.c2@1.2-service-ffmpeg
 LOCAL_MODULE_TAGS := optional
 LOCAL_PROPRIETARY_MODULE := true
@@ -57,6 +54,9 @@ LOCAL_SHARED_LIBRARIES := \
     libswresample \
     libswscale \
     libutils
+
+LOCAL_CFLAGS := \
+    -DTARGET_CONFIG=\"config-$(TARGET_ARCH_VARIANT).h\"
 
 include $(BUILD_EXECUTABLE)
 

@@ -3,7 +3,6 @@
 #include <cutils/log.h>
 #include <cutils/properties.h>
 
-#include "config.h"
 #include "ffmpeg_hwaccel.h"
 #include "libavutil/opt.h"
 

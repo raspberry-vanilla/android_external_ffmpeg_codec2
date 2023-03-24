@@ -19,9 +19,6 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-# Include base FFMPEG definitions.
-include external/ffmpeg/android/ffmpeg.mk
-
 LOCAL_MODULE := libffmpeg_utils
 LOCAL_PROPRIETARY_MODULE := true
 LOCAL_MODULE_TAGS := optional
