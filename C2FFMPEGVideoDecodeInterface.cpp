@@ -146,6 +146,37 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
                 .build());
     }
 
+    else if (strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_VIDEO_AV1) == 0) {
+        addParameter(
+                DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
+                .withDefault(new C2PortActualDelayTuning::output(8u))
+                .withFields({C2F(mActualOutputDelay, value).inRange(0, 34u)})
+                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
+                .build());
+
+        addParameter(
+                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
+                .withDefault(new C2StreamProfileLevelInfo::input(0u,
+                        C2Config::PROFILE_AV1_0, C2Config::LEVEL_AV1_2_1))
+                .withFields({
+                    C2F(mProfileLevel, profile).oneOf({
+                            C2Config::PROFILE_AV1_0,
+                            C2Config::PROFILE_AV1_1}),
+                    C2F(mProfileLevel, level).oneOf({
+                            C2Config::LEVEL_AV1_2, C2Config::LEVEL_AV1_2_1,
+                            C2Config::LEVEL_AV1_2_2, C2Config::LEVEL_AV1_2_3,
+                            C2Config::LEVEL_AV1_3, C2Config::LEVEL_AV1_3_1,
+                            C2Config::LEVEL_AV1_3_2, C2Config::LEVEL_AV1_3_3,
+                            C2Config::LEVEL_AV1_4, C2Config::LEVEL_AV1_4_1,
+                            C2Config::LEVEL_AV1_4_2, C2Config::LEVEL_AV1_4_3,
+                            C2Config::LEVEL_AV1_5, C2Config::LEVEL_AV1_5_1,
+                            C2Config::LEVEL_AV1_5_2, C2Config::LEVEL_AV1_5_3
+                    })
+                })
+                .withSetter(ProfileLevelSetter, mSize)
+                .build());
+    }
+
     else {
         int nthreads = base::GetIntProperty("debug.ffmpeg_codec2.threads", 0);
 
