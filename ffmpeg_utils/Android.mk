@@ -20,8 +20,8 @@ LOCAL_PATH := $(call my-dir)
 include $(CLEAR_VARS)
 
 LOCAL_MODULE := libffmpeg_utils
-LOCAL_PROPRIETARY_MODULE := true
-LOCAL_MODULE_TAGS := optional
+LOCAL_VENDOR_MODULE := true
+LOCAL_MODULE_TARGET_ARCH := $(TARGET_ARCH)
 
 LOCAL_SRC_FILES := \
     ffmpeg_hwaccel.c \
