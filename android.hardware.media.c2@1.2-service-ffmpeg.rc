@@ -16,7 +16,7 @@
 
 service android-hardware-media-c2-ffmpeg-hal-1-2 /vendor/bin/hw/android.hardware.media.c2@1.2-service-ffmpeg
     class hal
-    user mediacodec
-    group camera mediadrm drmrpc
+    user media
+    group mediadrm drmrpc
     ioprio rt 4
     task_profiles ProcessCapacityHigh
