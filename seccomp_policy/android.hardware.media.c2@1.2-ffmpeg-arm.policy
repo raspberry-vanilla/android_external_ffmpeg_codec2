@@ -68,7 +68,6 @@ madvise: 1
 # crash dump policy additions
 sigreturn: 1
 clock_gettime: 1
-futex: 1
 getpid: 1
 gettid: 1
 pipe2: 1
@@ -84,3 +83,6 @@ geteuid32: 1
 getgid32: 1
 getegid32: 1
 getgroups32: 1
+
+sched_getaffinity: 1
+eventfd2: 1
