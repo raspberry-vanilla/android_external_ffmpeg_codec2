@@ -68,7 +68,6 @@ madvise: 1
 # crash dump policy additions
 sigreturn: 1
 clock_gettime: 1
-futex: 1
 getpid: 1
 gettid: 1
 pipe2: 1
