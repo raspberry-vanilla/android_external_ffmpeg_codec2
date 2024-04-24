@@ -153,17 +153,9 @@ void C2FFMPEGVideoDecodeComponent::deInitDecoder() {
         if (avcodec_is_open(mCtx)) {
             avcodec_flush_buffers(mCtx);
         }
-        if (mCtx->extradata) {
-            av_free(mCtx->extradata);
-            mCtx->extradata = NULL;
-            mCtx->extradata_size = 0;
-        }
-        if (mCodecAlreadyOpened) {
-            avcodec_close(mCtx);
-            mCodecAlreadyOpened = false;
-        }
         ffmpeg_hwaccel_deinit(mCtx);
-        av_freep(&mCtx);
+        avcodec_free_context(&mCtx);
+        mCodecAlreadyOpened = false;
     }
     if (mFrame) {
         av_frame_free(&mFrame);
