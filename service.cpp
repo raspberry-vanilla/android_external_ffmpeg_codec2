@@ -49,6 +49,7 @@ static constexpr char kExtSeccompPolicyPath[] =
         "android.hardware.media.c2@1.2-ffmpeg-extended.policy";
 
 static const C2FFMPEGComponentInfo kFFMPEGVideoComponents[] = {
+    { "c2.ffmpeg.av1.decoder"   , MEDIA_MIMETYPE_VIDEO_AV1   , AV_CODEC_ID_AV1        },
     { "c2.ffmpeg.h263.decoder"  , MEDIA_MIMETYPE_VIDEO_H263  , AV_CODEC_ID_H263       },
     { "c2.ffmpeg.h264.decoder"  , MEDIA_MIMETYPE_VIDEO_AVC   , AV_CODEC_ID_H264       },
     { "c2.ffmpeg.hevc.decoder"  , MEDIA_MIMETYPE_VIDEO_HEVC  , AV_CODEC_ID_HEVC       },
