@@ -81,3 +81,4 @@ getgroups: 1
 
 sched_getaffinity: 1
 eventfd2: 1
+mkdirat: 1
