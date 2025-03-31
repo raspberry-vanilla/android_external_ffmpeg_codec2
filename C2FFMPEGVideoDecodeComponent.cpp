@@ -99,7 +99,7 @@ c2_status_t C2FFMPEGVideoDecodeComponent::openDecoder() {
 
     // Find decoder again as codec_id may have changed.
     if (mCtx->codec_id == AV_CODEC_ID_H264 &&
-            base::GetBoolProperty("persist.ffmpeg_codec2.v4l2.h264", false)) {
+            base::GetBoolProperty("persist.vendor.ffmpeg_codec2.v4l2.h264", false)) {
         mCtx->codec = avcodec_find_decoder_by_name("h264_v4l2m2m");
     } else {
         mCtx->codec = avcodec_find_decoder(mCtx->codec_id);
