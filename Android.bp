@@ -1,0 +1,54 @@
+// Copyright (C) 2022 Michael Goffioul <michael.goffioul@gmail.com>
+// Copyright (C) 2025 KonstaKANG
+//
+// SPDX-License-Identifier: Apache-2.0
+
+cc_binary {
+    name: "android.hardware.media.c2@1.2-service-ffmpeg",
+    relative_install_path: "hw",
+    vendor: true,
+    init_rc: ["android.hardware.media.c2@1.2-service-ffmpeg.rc"],
+    vintf_fragments: ["android.hardware.media.c2@1.2-service-ffmpeg.xml"],
+    srcs: [
+        "C2FFMPEGAudioDecodeComponent.cpp",
+        "C2FFMPEGAudioDecodeInterface.cpp",
+        "C2FFMPEGVideoDecodeComponent.cpp",
+        "C2FFMPEGVideoDecodeInterface.cpp",
+        "service.cpp",
+    ],
+    shared_libs: [
+        "android.hardware.media.c2@1.2",
+        "libavcodec",
+        "libavservices_minijail",
+        "libavutil",
+        "libbase",
+        "libbinder",
+        "libcodec2_hidl@1.2",
+        "libcodec2_soft_common",
+        "libcodec2_vndk",
+        "libffmpeg_utils",
+        "libhidlbase",
+        "liblog",
+        "libstagefright_foundation",
+        "libswresample",
+        "libswscale",
+        "libutils",
+    ],
+    required: [
+        "android.hardware.media.c2@1.2-ffmpeg.policy",
+        "media_codecs_ffmpeg_c2.xml",
+    ],
+}
+
+prebuilt_etc {
+    name: "android.hardware.media.c2@1.2-ffmpeg.policy",
+    src: "android.hardware.media.c2@1.2-ffmpeg.policy",
+    vendor: true,
+    sub_dir: "seccomp_policy",
+}
+
+prebuilt_etc {
+    name: "media_codecs_ffmpeg_c2.xml",
+    src: "media_codecs_ffmpeg_c2.xml",
+    vendor: true,
+}
