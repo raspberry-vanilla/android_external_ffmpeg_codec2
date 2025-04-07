@@ -7,8 +7,6 @@ cc_binary {
     name: "android.hardware.media.c2-service-ffmpeg",
     relative_install_path: "hw",
     vendor: true,
-    init_rc: ["android.hardware.media.c2-service-ffmpeg.rc"],
-    vintf_fragments: ["android.hardware.media.c2-service-ffmpeg.xml"],
     srcs: [
         "C2FFMPEGAudioDecodeComponent.cpp",
         "C2FFMPEGAudioDecodeInterface.cpp",
@@ -37,6 +35,36 @@ cc_binary {
     required: [
         "android.hardware.media.c2-ffmpeg.policy",
         "media_codecs_ffmpeg_c2.xml",
+    ],
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "android.hardware.media.c2-service-ffmpeg.rc",
+    src: "android.hardware.media.c2-service-ffmpeg.rc",
+    installable: false,
+}
+
+prebuilt_etc {
+    name: "android.hardware.media.c2-service-ffmpeg.xml",
+    src: "android.hardware.media.c2-service-ffmpeg.xml",
+    sub_dir: "vintf",
+    installable: false,
+}
+
+apex {
+    name: "com.android.hardware.media.c2.ffmpeg",
+    manifest: "apex_manifest.json",
+    file_contexts: "apex_file_contexts",
+    key: "com.android.hardware.key",
+    certificate: ":com.android.hardware.certificate",
+    updatable: false,
+    vendor: true,
+    binaries: ["android.hardware.media.c2-service-ffmpeg"],
+
+    prebuilts: [
+        "android.hardware.media.c2-service-ffmpeg.rc",
+        "android.hardware.media.c2-service-ffmpeg.xml",
     ],
 }
 
