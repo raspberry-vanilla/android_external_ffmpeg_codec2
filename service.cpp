@@ -15,13 +15,13 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "android.hardware.media.c2@1.2-service-ffmpeg"
+#define LOG_TAG "android.hardware.media.c2-service-ffmpeg"
 
 #include <android-base/logging.h>
 #include <android-base/properties.h>
-#include <binder/ProcessState.h>
-#include <codec2/hidl/1.2/ComponentStore.h>
-#include <hidl/HidlTransportSupport.h>
+#include <android/binder_manager.h>
+#include <android/binder_process.h>
+#include <codec2/aidl/ComponentStore.h>
 #include <minijail.h>
 
 #include <util/C2InterfaceHelper.h>
@@ -34,19 +34,19 @@
 #include "C2FFMPEGVideoDecodeComponent.h"
 #include "C2FFMPEGVideoDecodeInterface.h"
 
-namespace android {
-
 // This is the absolute on-device path of the prebuild_etc module
-// "android.hardware.media.c2@1.1-ffmpeg-seccomp_policy" in Android.bp.
+// "android.hardware.media.c2-ffmpeg.policy" in Android.bp.
 static constexpr char kBaseSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/"
-        "android.hardware.media.c2@1.2-ffmpeg.policy";
+        "android.hardware.media.c2-ffmpeg.policy";
 
 // Additional seccomp permissions can be added in this file.
 // This file does not exist by default.
 static constexpr char kExtSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/"
-        "android.hardware.media.c2@1.2-ffmpeg-extended.policy";
+        "android.hardware.media.c2-ffmpeg-extended.policy";
+
+namespace android {
 
 static const C2FFMPEGComponentInfo kFFMPEGVideoComponents[] = {
     { "c2.ffmpeg.av1.decoder"   , MEDIA_MIMETYPE_VIDEO_AV1   , AV_CODEC_ID_AV1        },
@@ -240,8 +240,8 @@ private:
                 .withFields({
                     C2F(mDmaBufUsageInfo, m.usage).flags({C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE}),
                     C2F(mDmaBufUsageInfo, m.capacity).inRange(0, UINT32_MAX, 1024),
-                    C2F(mDmaBufUsageInfo, m.heapName).any(),
                     C2F(mDmaBufUsageInfo, m.allocFlags).flags({}),
+                    C2F(mDmaBufUsageInfo, m.heapName).any(),
                 })
                 .withSetter(SetDmaBufUsage)
                 .build());
@@ -276,45 +276,26 @@ private:
 } // namespace android
 
 int main(int /* argc */, char** /* argv */) {
-    using namespace ::android;
-    LOG(DEBUG) << "android.hardware.media.c2@1.2-service-ffmpeg starting...";
+    LOG(DEBUG) << "android.hardware.media.c2-service-ffmpeg starting...";
 
     // Set up minijail to limit system calls.
     signal(SIGPIPE, SIG_IGN);
-    SetUpMinijail(kBaseSeccompPolicyPath, kExtSeccompPolicyPath);
+    android::SetUpMinijail(kBaseSeccompPolicyPath, kExtSeccompPolicyPath);
 
-    ProcessState::self()->startThreadPool();
     // Extra threads may be needed to handle a stacked IPC sequence that
     // contains alternating binder and hwbinder calls. (See b/35283480.)
-    hardware::configureRpcThreadpool(8, true /* callerWillJoin */);
+    ABinderProcess_setThreadPoolMaxThreadCount(8);
+    ABinderProcess_startThreadPool();
 
     // Create IComponentStore service.
-    {
-        using namespace ::android::hardware::media::c2::V1_2;
-        sp<IComponentStore> store;
+    using namespace ::aidl::android::hardware::media::c2;
+    std::shared_ptr<IComponentStore> store = ndk::SharedRefBase::make<utils::ComponentStore>(
+            std::make_shared<android::StoreImpl>());
 
-        // TODO: Replace this with
-        // store = new utils::ComponentStore(
-        //         /* implementation of C2ComponentStore */);
-        LOG(DEBUG) << "Instantiating Codec2's IComponentStore service...";
-        store = new utils::ComponentStore(
-                std::make_shared<StoreImpl>());
+    const std::string instance = std::string() + IComponentStore::descriptor + "/ffmpeg";
+    binder_status_t status = AServiceManager_addService(store->asBinder().get(), instance.c_str());
+    CHECK(status == STATUS_OK);
 
-        if (store == nullptr) {
-            LOG(ERROR) << "Cannot create Codec2's IComponentStore service.";
-        } else {
-            constexpr char const* serviceName = "ffmpeg";
-            if (store->registerAsService(serviceName) != OK) {
-                LOG(ERROR) << "Cannot register Codec2's IComponentStore service"
-                              " with instance name << \""
-                           << serviceName << "\".";
-            } else {
-                LOG(DEBUG) << "Codec2's IComponentStore service registered. "
-                              "Instance name: \"" << serviceName << "\".";
-            }
-        }
-    }
-
-    hardware::joinRpcThreadpool();
-    return 0;
+    ABinderProcess_joinThreadPool();
+    return EXIT_FAILURE;  // should not reach
 }
