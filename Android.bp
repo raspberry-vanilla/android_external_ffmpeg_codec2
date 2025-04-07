@@ -67,16 +67,3 @@ apex {
         "android.hardware.media.c2-service-ffmpeg.xml",
     ],
 }
-
-prebuilt_etc {
-    name: "android.hardware.media.c2-ffmpeg.policy",
-    src: "android.hardware.media.c2-ffmpeg.policy",
-    vendor: true,
-    sub_dir: "seccomp_policy",
-}
-
-prebuilt_etc {
-    name: "media_codecs_ffmpeg_c2.xml",
-    src: "media_codecs_ffmpeg_c2.xml",
-    vendor: true,
-}
