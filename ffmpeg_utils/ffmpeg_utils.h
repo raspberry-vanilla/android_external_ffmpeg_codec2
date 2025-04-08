@@ -16,21 +16,14 @@
  */
 
 #ifndef FFMPEG_UTILS_H_
-
 #define FFMPEG_UTILS_H_
 
-#include <unistd.h>
-#include <stdlib.h>
-
-#include <utils/Condition.h>
-#include <utils/Errors.h>
 #include <utils/Mutex.h>
 
 extern "C" {
 
 #include "libavformat/avformat.h"
 #include "libavcodec/avcodec.h"
-#include "libavcodec/bsf.h"
 #include "libswscale/swscale.h"
 #include "libswresample/swresample.h"
 #include "libavutil/opt.h"
@@ -40,21 +33,11 @@ extern "C" {
 
 namespace android {
 
-//////////////////////////////////////////////////////////////////////////////////
-// log
-//////////////////////////////////////////////////////////////////////////////////
 void nam_av_log_callback(void* ptr, int level, const char* fmt, va_list vl);
-void nam_av_log_set_flags(int arg);
 
-//////////////////////////////////////////////////////////////////////////////////
-// constructor and destructor
-//////////////////////////////////////////////////////////////////////////////////
 status_t initFFmpeg();
 void deInitFFmpeg();
 
-//////////////////////////////////////////////////////////////////////////////////
-// misc
-//////////////////////////////////////////////////////////////////////////////////
 bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
         const uint8_t *header_start[3], const int header_len[3]);
 

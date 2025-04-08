@@ -33,7 +33,6 @@ LOCAL_SHARED_LIBRARIES += \
     libavutil \
     libcutils \
     liblog \
-    libstagefright_foundation \
     libswresample \
     libswscale \
     libutils

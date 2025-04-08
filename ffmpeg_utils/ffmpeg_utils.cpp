@@ -16,43 +16,24 @@
  */
 
 #define LOG_TAG "FFMPEG"
-#include <utils/Log.h>
 
-#include <utils/Errors.h>
-
-extern "C" {
-
-#include <unistd.h>
-#include <stdlib.h>
-#include <inttypes.h>
-#include <math.h>
-#include <limits.h> /* INT_MAX */
-#include <time.h>
-
-#undef strncpy
-#include <string.h>
-
-}
-
+#include <cutils/log.h>
 #include <cutils/properties.h>
 
 #include "ffmpeg_utils.h"
 
-// log
-static int flags;
+#define LOG_BUF_SIZE 1024
 
-// init ffmpeg
+static int flags = AV_LOG_SKIP_REPEATED;
+
 static pthread_mutex_t s_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 static int s_ref_count = 0;
 
 namespace android {
 
-//////////////////////////////////////////////////////////////////////////////////
-// log
-//////////////////////////////////////////////////////////////////////////////////
 static void sanitize(uint8_t *line){
-    while(*line){
-        if(*line < 0x08 || (*line > 0x0D && *line < 0x20))
+    while (*line) {
+        if (*line < 0x08 || (*line > 0x0D && *line < 0x20))
             *line='?';
         line++;
     }
@@ -63,8 +44,8 @@ void nam_av_log_callback(void* ptr, int level, const char* fmt, va_list vl)
 {
     static int print_prefix = 1;
     static int count;
-    static char prev[1024];
-    char line[1024];
+    static char prev[LOG_BUF_SIZE];
+    char line[LOG_BUF_SIZE];
 
     if (level > av_log_get_level())
         return;
@@ -81,10 +62,6 @@ void nam_av_log_callback(void* ptr, int level, const char* fmt, va_list vl)
     strcpy(prev, line);
     sanitize((uint8_t *)line);
 
-#if 0
-    ALOGI("%s", line);
-#else
-#define LOG_BUF_SIZE 1024
     static char g_msg[LOG_BUF_SIZE];
     static int g_msg_len = 0;
 
@@ -115,17 +92,7 @@ void nam_av_log_callback(void* ptr, int level, const char* fmt, va_list vl)
         memset(g_msg, 0, LOG_BUF_SIZE);
         g_msg_len = 0;
      } while (check_len > LOG_BUF_SIZE);
-#endif
 }
-
-void nam_av_log_set_flags(int arg)
-{
-    flags = arg;
-}
-
-//////////////////////////////////////////////////////////////////////////////////
-// constructor and destructor
-//////////////////////////////////////////////////////////////////////////////////
 
 static int parseLogLevel(const char* s) {
     if (strcmp(s, "quiet") == 0)
@@ -152,10 +119,10 @@ static int parseLogLevel(const char* s) {
     }
 }
 
-/**
+/*
  * To set ffmpeg log level, type this command on the console before starting playback:
- *     setprop debug.ffmpeg.loglevel [quiet|panic|fatal|error|warning|info|verbose|debug|trace]
-*/
+ * setprop debug.ffmpeg.loglevel [quiet|panic|fatal|error|warning|info|verbose|debug|trace]
+ */
 status_t initFFmpeg() 
 {
     status_t ret = OK;
@@ -169,8 +136,7 @@ status_t initFFmpeg()
         av_log_set_level(AV_LOG_INFO);
     }
 
-    if(s_ref_count == 0) {
-        nam_av_log_set_flags(AV_LOG_SKIP_REPEATED);
+    if (s_ref_count == 0) {
         av_log_set_callback(nam_av_log_callback);
 
         /* global ffmpeg initialization */
@@ -194,7 +160,7 @@ void deInitFFmpeg()
     // update counter
     s_ref_count--;
 
-    if(s_ref_count == 0) {
+    if (s_ref_count == 0) {
         avformat_network_deinit();
         ALOGD("FFMPEG deinitialized");
     }
@@ -202,9 +168,6 @@ void deInitFFmpeg()
     pthread_mutex_unlock(&s_init_mutex);
 }
 
-//////////////////////////////////////////////////////////////////////////////////
-// misc
-//////////////////////////////////////////////////////////////////////////////////
 bool setup_vorbis_extradata(uint8_t **extradata, int *extradata_size,
         const uint8_t *header_start[3], const int header_len[3])
 {
