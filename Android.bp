@@ -10,9 +10,11 @@ cc_binary {
     srcs: [
         "C2FFMPEGAudioDecodeComponent.cpp",
         "C2FFMPEGAudioDecodeInterface.cpp",
+        "C2FFMPEGComponentInterface.cpp",
+        "C2FFMPEGComponentStore.cpp",
         "C2FFMPEGVideoDecodeComponent.cpp",
         "C2FFMPEGVideoDecodeInterface.cpp",
-        "service.cpp",
+        "main.cpp",
     ],
     shared_libs: [
         "android.hardware.media.c2-V1-ndk",
