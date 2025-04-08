@@ -3,8 +3,8 @@
 //
 // SPDX-License-Identifier: Apache-2.0
 
-cc_binary {
-    name: "android.hardware.media.c2-service-ffmpeg",
+cc_defaults {
+    name: "ffmpeg_codec2_defaults",
     relative_install_path: "hw",
     vendor: true,
     srcs: [
@@ -14,17 +14,12 @@ cc_binary {
         "C2FFMPEGComponentStore.cpp",
         "C2FFMPEGVideoDecodeComponent.cpp",
         "C2FFMPEGVideoDecodeInterface.cpp",
-        "main.cpp",
     ],
     shared_libs: [
-        "android.hardware.media.c2-V1-ndk",
         "libavcodec",
         "libavservices_minijail",
         "libavutil",
         "libbase",
-        "libbinder_ndk",
-        "libcodec2_aidl",
-        "libcodec2_hal_common",
         "libcodec2_soft_common",
         "libcodec2_vndk",
         "libffmpeg_utils",
@@ -34,10 +29,40 @@ cc_binary {
         "libswscale",
         "libutils",
     ],
+}
+
+cc_binary {
+    name: "android.hardware.media.c2@1.2-service-ffmpeg",
+    init_rc: ["android.hardware.media.c2@1.2-service-ffmpeg.rc"],
+    vintf_fragments: ["android.hardware.media.c2@1.2-service-ffmpeg.xml"],
+    srcs: [
+        "main-hidl.cpp",
+    ],
+    shared_libs: [
+        "android.hardware.media.c2@1.2",
+        "libbinder",
+        "libcodec2_hidl@1.2",
+        "libhidlbase",
+    ],
+    defaults: ["ffmpeg_codec2_defaults"],
+}
+
+cc_binary {
+    name: "android.hardware.media.c2-service-ffmpeg",
+    srcs: [
+        "main.cpp",
+    ],
+    shared_libs: [
+        "android.hardware.media.c2-V1-ndk",
+        "libbinder_ndk",
+        "libcodec2_aidl",
+        "libcodec2_hal_common",
+    ],
     required: [
         "android.hardware.media.c2-ffmpeg.policy",
         "media_codecs_ffmpeg_c2.xml",
     ],
+    defaults: ["ffmpeg_codec2_defaults"],
     installable: false,
 }
 
