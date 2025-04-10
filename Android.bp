@@ -58,10 +58,6 @@ cc_binary {
         "libcodec2_aidl",
         "libcodec2_hal_common",
     ],
-    required: [
-        "android.hardware.media.c2-ffmpeg.policy",
-        "media_codecs_ffmpeg_c2.xml",
-    ],
     defaults: ["ffmpeg_codec2_defaults"],
     installable: false,
 }
