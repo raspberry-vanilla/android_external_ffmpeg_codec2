@@ -645,33 +645,11 @@ void C2FFMPEGAudioDecodeComponent::process(
 
             std::shared_ptr<C2Buffer> buffer = createLinearBuffer(std::move(block), 0, len);
 
-            if (mCtx->codec->capabilities & AV_CODEC_CAP_SUBFRAMES) {
-                auto fillWork = [buffer, &work, this](const std::unique_ptr<C2Work>& clone) {
-                    clone->worklets.front()->output.configUpdate = std::move(work->worklets.front()->output.configUpdate);
-                    clone->worklets.front()->output.buffers.clear();
-                    clone->worklets.front()->output.buffers.push_back(buffer);
-                    clone->worklets.front()->output.ordinal = clone->input.ordinal;
-                    if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
-                        work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
-                    }
-                    clone->worklets.front()->output.flags = C2FrameData::FLAG_INCOMPLETE;
-                    clone->workletsProcessed = 1u;
-                    clone->result = C2_OK;
-                };
-
-#if DEBUG_FRAMES
-                ALOGD("process: send subframe buffer ts=%" PRIu64 " idx=%" PRIu64,
-                      work->input.ordinal.timestamp.peeku(), work->input.ordinal.frameIndex.peeku());
-#endif
-                cloneAndSend(work->input.ordinal.frameIndex.peeku(), work, fillWork);
+            work->worklets.front()->output.buffers.push_back(buffer);
+            if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
+                work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
             }
-            else {
-                work->worklets.front()->output.buffers.push_back(buffer);
-                if (mFrame->best_effort_timestamp != AV_NOPTS_VALUE) {
-                    work->worklets.front()->output.ordinal.timestamp = mFrame->best_effort_timestamp;
-                }
-                break;
-            }
+            break;
         }
     }
 #if DEBUG_FRAMES
