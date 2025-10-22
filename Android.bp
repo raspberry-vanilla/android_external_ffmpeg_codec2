@@ -38,6 +38,13 @@ cc_binary {
 }
 
 prebuilt_etc {
+    name: "android.hardware.media.c2-ffmpeg.policy",
+    src: "android.hardware.media.c2-ffmpeg.policy",
+    vendor: true,
+    sub_dir: "seccomp_policy",
+}
+
+prebuilt_etc {
     name: "android.hardware.media.c2-service-ffmpeg.rc",
     src: "android.hardware.media.c2-service-ffmpeg.rc",
     installable: false,
@@ -64,4 +71,5 @@ apex {
         "android.hardware.media.c2-service-ffmpeg.rc",
         "android.hardware.media.c2-service-ffmpeg.xml",
     ],
+    required: ["android.hardware.media.c2-ffmpeg.policy"],
 }
