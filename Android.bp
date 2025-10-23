@@ -38,10 +38,17 @@ cc_binary {
 }
 
 prebuilt_etc {
+    name: "android.hardware.media.c2-ffmpeg-default-seccomp_policy",
+    src: ":android.hardware.media.c2-default-seccomp_policy",
+    sub_dir: "seccomp_policy",
+    installable: false,
+}
+
+prebuilt_etc {
     name: "android.hardware.media.c2-ffmpeg-extended-seccomp_policy",
     src: "android.hardware.media.c2-ffmpeg-extended-seccomp_policy",
-    vendor: true,
     sub_dir: "seccomp_policy",
+    installable: false,
 }
 
 prebuilt_etc {
@@ -68,11 +75,9 @@ apex {
     binaries: ["android.hardware.media.c2-service-ffmpeg"],
 
     prebuilts: [
+        "android.hardware.media.c2-ffmpeg-default-seccomp_policy",
+        "android.hardware.media.c2-ffmpeg-extended-seccomp_policy",
         "android.hardware.media.c2-service-ffmpeg.rc",
         "android.hardware.media.c2-service-ffmpeg.xml",
-    ],
-    required: [
-        "android.hardware.media.c2-default-seccomp_policy",
-        "android.hardware.media.c2-ffmpeg-extended-seccomp_policy",
     ],
 }
