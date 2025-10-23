@@ -28,16 +28,16 @@
 using namespace ::aidl::android::hardware::media::c2;
 
 // This is the absolute on-device path of the prebuild_etc module
-// "android.hardware.media.c2-ffmpeg.policy" in Android.bp.
+// "android.hardware.media.c2-default-seccomp_policy" in Android.bp.
 static constexpr char kBaseSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/"
-        "android.hardware.media.c2-ffmpeg.policy";
+        "android.hardware.media.c2-default-seccomp_policy";
 
 // Additional seccomp permissions can be added in this file.
 // This file does not exist by default.
 static constexpr char kExtSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/"
-        "android.hardware.media.c2-ffmpeg-extended.policy";
+        "android.hardware.media.c2-ffmpeg-extended-seccomp_policy";
 
 int main() {
     LOG(DEBUG) << "android.hardware.media.c2-service-ffmpeg starting...";

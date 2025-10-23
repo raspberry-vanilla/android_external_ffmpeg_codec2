@@ -1,0 +1,4 @@
+# device specific syscalls
+eventfd2: 1
+sched_getaffinity: 1
+sysinfo: 1
