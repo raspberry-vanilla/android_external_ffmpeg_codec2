@@ -55,7 +55,7 @@ int ffmpeg_hwaccel_init(AVCodecContext *avctx) {
 void ffmpeg_hwaccel_deinit(AVCodecContext *avctx __unused) {
 }
 
-int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
+int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx, AVFrame *frame) {
     if (!frame->hw_frames_ctx) {
         // Frame is not hw-accel
         return 0;
@@ -69,7 +69,10 @@ int ffmpeg_hwaccel_get_frame(AVCodecContext *avctx __unused, AVFrame *frame) {
         return AVERROR(ENOMEM);
     }
 
-    output->format = AV_PIX_FMT_NV12;
+    output->format = AV_PIX_FMT_YUV420P;
+    if (avctx->profile == AV_PROFILE_HEVC_MAIN_10) {
+        output->format = AV_PIX_FMT_NV12;
+    }
 
     err = av_hwframe_transfer_data(output, frame, 0);
     if (err < 0) {

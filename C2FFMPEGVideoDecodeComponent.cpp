@@ -135,8 +135,10 @@ c2_status_t C2FFMPEGVideoDecodeComponent::openDecoder() {
     }
     mCodecAlreadyOpened = true;
 
-    ALOGD("openDecoder: open ffmpeg video decoder(%s) success, caps = %08x",
-          avcodec_get_name(mCtx->codec_id), mCtx->codec->capabilities);
+    ALOGD("openDecoder: open ffmpeg video decoder(%s) profile(%s) success, caps = %08x",
+          avcodec_get_name(mCtx->codec_id),
+          avcodec_profile_name(mCtx->codec_id, mCtx->profile),
+          mCtx->codec->capabilities);
 
     mFrame = av_frame_alloc();
     if (! mFrame) {
