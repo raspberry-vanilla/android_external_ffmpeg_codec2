@@ -35,6 +35,7 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
         C2Component::KIND_DECODER,
         C2Component::DOMAIN_VIDEO,
         componentInfo->mediaType) {
+    mIsHevc = strcasecmp(componentInfo->mediaType, MEDIA_MIMETYPE_VIDEO_HEVC) == 0;
     noPrivateBuffers();
     noInputReferences();
     noOutputReferences();
@@ -232,11 +233,95 @@ C2FFMPEGVideoDecodeInterface::C2FFMPEGVideoDecodeInterface(
             .withConstValue(defaultColorInfo)
             .build());
 
-    addParameter(
-            DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
-            .withConstValue(new C2StreamPixelFormatInfo::output(
-                                 0u, HAL_PIXEL_FORMAT_YV12))
-            .build());
+    if (mIsHevc) {
+        // HEVC Main 10 can be output as 10-bit P010 (needed for HDR10/HLG).
+        // IMPLEMENTATION_DEFINED must be listed: the framework configures it
+        // when the output is a Surface, and it is the only way for the
+        // component to know that a 10-bit format may be chosen.
+        // YCBCR_420_888 is what CCodec configures for ByteBuffer mode
+        // (COLOR_FormatYUV420Flexible/Planar/SemiPlanar). The setter is lenient:
+        // a strict setter would turn any other requested value into
+        // C2SettingResult::BAD_VALUE, which makes CCodec::configure() fail
+        // (the previous const parameter only produced a non-fatal READ_ONLY).
+        addParameter(
+                DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
+                .withDefault(new C2StreamPixelFormatInfo::output(
+                                     0u, HAL_PIXEL_FORMAT_YV12))
+                .withFields({C2F(mPixelFormat, value).oneOf({
+                        HAL_PIXEL_FORMAT_YV12,
+                        HAL_PIXEL_FORMAT_YCBCR_420_888,
+                        HAL_PIXEL_FORMAT_YCBCR_P010,
+                        HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED})})
+                .withSetter(PixelFormatSetter)
+                .build());
+
+        // Colour aspects coming from the container / client (KEY_COLOR_*),
+        // used for every field the bitstream (VUI) leaves unspecified.
+        addParameter(
+                DefineParam(mDefaultColorAspects, C2_PARAMKEY_DEFAULT_COLOR_ASPECTS)
+                .withDefault(new C2StreamColorAspectsTuning::output(
+                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+                .withFields({
+                    C2F(mDefaultColorAspects, range).inRange(
+                            C2Color::RANGE_UNSPECIFIED, C2Color::RANGE_OTHER),
+                    C2F(mDefaultColorAspects, primaries).inRange(
+                            C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                    C2F(mDefaultColorAspects, transfer).inRange(
+                            C2Color::TRANSFER_UNSPECIFIED, C2Color::TRANSFER_OTHER),
+                    C2F(mDefaultColorAspects, matrix).inRange(
+                            C2Color::MATRIX_UNSPECIFIED, C2Color::MATRIX_OTHER)
+                })
+                .withSetter(DefaultColorAspectsSetter)
+                .build());
+
+        // Colour aspects and HDR static info of the decoded stream, reported
+        // to the framework through configUpdate once the first frame is known.
+        addParameter(
+                DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
+                .withDefault(new C2StreamColorAspectsInfo::output(
+                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+                .withFields({
+                    C2F(mColorAspects, range).inRange(
+                            C2Color::RANGE_UNSPECIFIED, C2Color::RANGE_OTHER),
+                    C2F(mColorAspects, primaries).inRange(
+                            C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                    C2F(mColorAspects, transfer).inRange(
+                            C2Color::TRANSFER_UNSPECIFIED, C2Color::TRANSFER_OTHER),
+                    C2F(mColorAspects, matrix).inRange(
+                            C2Color::MATRIX_UNSPECIFIED, C2Color::MATRIX_OTHER)
+                })
+                .withSetter(ColorAspectsSetter)
+                .build());
+
+        helper->addStructDescriptors<C2MasteringDisplayColorVolumeStruct, C2ColorXyStruct>();
+        addParameter(
+                DefineParam(mHdrStaticInfo, C2_PARAMKEY_HDR_STATIC_INFO)
+                .withDefault(new C2StreamHdrStaticInfo::output(0u))
+                .withFields({
+                    C2F(mHdrStaticInfo, mastering.red.x).any(),
+                    C2F(mHdrStaticInfo, mastering.red.y).any(),
+                    C2F(mHdrStaticInfo, mastering.green.x).any(),
+                    C2F(mHdrStaticInfo, mastering.green.y).any(),
+                    C2F(mHdrStaticInfo, mastering.blue.x).any(),
+                    C2F(mHdrStaticInfo, mastering.blue.y).any(),
+                    C2F(mHdrStaticInfo, mastering.white.x).any(),
+                    C2F(mHdrStaticInfo, mastering.white.y).any(),
+                    C2F(mHdrStaticInfo, mastering.maxLuminance).any(),
+                    C2F(mHdrStaticInfo, mastering.minLuminance).any(),
+                    C2F(mHdrStaticInfo, maxCll).any(),
+                    C2F(mHdrStaticInfo, maxFall).any(),
+                })
+                .withSetter(HdrStaticInfoSetter)
+                .build());
+    } else {
+        addParameter(
+                DefineParam(mPixelFormat, C2_PARAMKEY_PIXEL_FORMAT)
+                .withConstValue(new C2StreamPixelFormatInfo::output(
+                                     0u, HAL_PIXEL_FORMAT_YV12))
+                .build());
+    }
 
     addParameter(
             DefineParam(mConsumerUsage, C2_PARAMKEY_OUTPUT_STREAM_USAGE)
@@ -263,6 +348,60 @@ C2R C2FFMPEGVideoDecodeInterface::SizeSetter(
     }
 
     return res;
+}
+
+C2R C2FFMPEGVideoDecodeInterface::PixelFormatSetter(
+        bool /* mayBlock */,
+        const C2P<C2StreamPixelFormatInfo::output> &oldMe,
+        C2P<C2StreamPixelFormatInfo::output> &me) {
+    // Never fail: unknown formats (e.g. RGB requested by a thumbnailer) keep
+    // the previous value; the component then outputs YV12 as it always did.
+    if (!me.F(me.v.value).supportsAtAll(me.v.value)) {
+        me.set().value = oldMe.v.value;
+    }
+    return C2R::Ok();
+}
+
+C2R C2FFMPEGVideoDecodeInterface::DefaultColorAspectsSetter(
+        bool /* mayBlock */,
+        C2P<C2StreamColorAspectsTuning::output> &me) {
+    if (me.v.range > C2Color::RANGE_OTHER) {
+        me.set().range = C2Color::RANGE_OTHER;
+    }
+    if (me.v.primaries > C2Color::PRIMARIES_OTHER) {
+        me.set().primaries = C2Color::PRIMARIES_OTHER;
+    }
+    if (me.v.transfer > C2Color::TRANSFER_OTHER) {
+        me.set().transfer = C2Color::TRANSFER_OTHER;
+    }
+    if (me.v.matrix > C2Color::MATRIX_OTHER) {
+        me.set().matrix = C2Color::MATRIX_OTHER;
+    }
+    return C2R::Ok();
+}
+
+C2R C2FFMPEGVideoDecodeInterface::ColorAspectsSetter(
+        bool /* mayBlock */,
+        C2P<C2StreamColorAspectsInfo::output> &me) {
+    if (me.v.range > C2Color::RANGE_OTHER) {
+        me.set().range = C2Color::RANGE_OTHER;
+    }
+    if (me.v.primaries > C2Color::PRIMARIES_OTHER) {
+        me.set().primaries = C2Color::PRIMARIES_OTHER;
+    }
+    if (me.v.transfer > C2Color::TRANSFER_OTHER) {
+        me.set().transfer = C2Color::TRANSFER_OTHER;
+    }
+    if (me.v.matrix > C2Color::MATRIX_OTHER) {
+        me.set().matrix = C2Color::MATRIX_OTHER;
+    }
+    return C2R::Ok();
+}
+
+C2R C2FFMPEGVideoDecodeInterface::HdrStaticInfoSetter(
+        bool /* mayBlock */,
+        C2P<C2StreamHdrStaticInfo::output> &me __unused) {
+    return C2R::Ok();
 }
 
 C2R C2FFMPEGVideoDecodeInterface::ProfileLevelSetter(
