@@ -22,6 +22,9 @@
 #include <SimpleC2Interface.h>
 #include "C2FFMPEGVideoDecodeComponent.h"
 #include "ffmpeg_hwaccel.h"
+#include "libavutil/mastering_display_metadata.h"
+#include <sys/resource.h>
+#include <unistd.h>
 
 #define DEBUG_FRAMES 0
 #define DEBUG_WORKQUEUE 0
@@ -43,11 +46,35 @@ C2FFMPEGVideoDecodeComponent::C2FFMPEGVideoDecodeComponent(
       mFFMPEGInitialized(false),
       mCodecAlreadyOpened(false),
       mExtradataReady(false),
-      mEOSSignalled(false) {
+      mEOSSignalled(false),
+      mHalPixelFormat(HAL_PIXEL_FORMAT_YV12),
+      mClientPixelFormat(HAL_PIXEL_FORMAT_YV12),
+      mP010Mode(0),
+      mP010Supported(false),
+      mOutput10Bit(false),
+      mFrameIsHw(false),
+      mDirectNv12(true),
+      mColorAspectsSent(false),
+      mHdrSent(false),
+      mLastAspects(0u),
+      mLastHdr(0u),
+      mAsyncOutput(true),
+      mJobValid(false),
+      mJobRun(false),
+      mJobDone(false),
+      mWorkerExit(false) {
     ALOGD("C2FFMPEGVideoDecodeComponent: mediaType = %s", componentInfo->mediaType);
 }
 
 C2FFMPEGVideoDecodeComponent::~C2FFMPEGVideoDecodeComponent() {
+    {
+        std::lock_guard<std::mutex> lk(mJobMutex);
+        mWorkerExit = true;
+    }
+    mJobCv.notify_all();
+    if (mWorker.joinable()) {
+        mWorker.join();
+    }
     ALOGD("~C2FFMPEGVideoDecodeComponent: mCtx = %p", mCtx);
     onRelease();
 }
@@ -146,11 +173,44 @@ c2_status_t C2FFMPEGVideoDecodeComponent::openDecoder() {
         return C2_NO_MEMORY;
     }
 
+    initOutputPolicy();
+
     return C2_OK;
+}
+
+// Decide once per decoder open whether 10-bit output may be used at all.
+void C2FFMPEGVideoDecodeComponent::initOutputPolicy() {
+    mP010Mode = 0;
+    if (!mIntf->isHevc()) {
+        return;
+    }
+
+    const std::string mode = base::GetProperty("persist.vendor.ffmpeg_codec2.p010", "auto");
+    mP010Mode = mode == "off" ? 0 : (mode == "always" ? 2 : 1);
+    mDirectNv12 = base::GetBoolProperty("persist.vendor.ffmpeg_codec2.direct_nv12", true);
+    mAsyncOutput = base::GetBoolProperty("persist.vendor.ffmpeg_codec2.async_output", true);
+
+    // Only take the parameter value as the client's choice if it is not a
+    // value this component configured itself on a previous run.
+    const uint32_t fmt = mIntf->getPixelFormatLocked();
+    if (fmt != mHalPixelFormat || fmt == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+        mClientPixelFormat = fmt;
+    }
+
+    // Returns P010 only if gralloc can allocate it (AHardwareBuffer_isSupported);
+    // otherwise RGBA_1010102 or YV12, which this component cannot produce.
+    // NOTE: minigbm's gbm_mesa backend (rpi4) has no DRM_FORMAT_P010
+    // combination, so without a minigbm change this is false and the
+    // component keeps the 8-bit path instead of failing every frame.
+    mP010Supported = getHalPixelFormatForBitDepth10(false) == HAL_PIXEL_FORMAT_YCBCR_P010;
+
+    ALOGD("initOutputPolicy: p010 mode %d, client pixel format 0x%x, gralloc P010 %s",
+          mP010Mode, mClientPixelFormat, mP010Supported ? "yes" : "no");
 }
 
 void C2FFMPEGVideoDecodeComponent::deInitDecoder() {
     ALOGD("%p deInitDecoder: %p", this, mCtx);
+    dropJob();
     if (mCtx) {
         if (avcodec_is_open(mCtx)) {
             avcodec_flush_buffers(mCtx);
@@ -173,6 +233,13 @@ void C2FFMPEGVideoDecodeComponent::deInitDecoder() {
     }
     mEOSSignalled = false;
     mExtradataReady = false;
+    // mHalPixelFormat is intentionally kept: it mirrors the interface
+    // parameter, which survives a reset. Resetting it to YV12 here while the
+    // parameter still says P010 would make the next 8-bit frame skip the
+    // pixel-format configUpdate.
+    mOutput10Bit = false;
+    mColorAspectsSent = false;
+    mHdrSent = false;
     mPendingWorkQueue.clear();
 }
 
@@ -237,7 +304,19 @@ c2_status_t C2FFMPEGVideoDecodeComponent::receiveFrame(bool* hasPicture) {
 
     *hasPicture = false;
     if (err == 0) {
-        err = ffmpeg_hwaccel_get_frame(mCtx, mFrame);
+        // Decide before the HW transfer: the transfer format depends on it.
+        // Colour properties are valid on the HW frame (ff_decode_frame_props
+        // runs in ff_get_buffer for hwaccel frames too).
+        mOutput10Bit = allow10BitOutput();
+        mFrameIsHw = false;
+        if (mDirectNv12 && !mOutput10Bit && mFrame->hw_frames_ctx) {
+            // Keep the frame in decoder memory: it is converted straight into the
+            // output buffer in getOutputBuffer(), which saves a full-frame pass.
+            mFrameIsHw = true;
+            err = 0;
+        } else {
+            err = ffmpeg_hwaccel_get_frame(mCtx, mFrame, mOutput10Bit);
+        }
         if (err == 0) {
             *hasPicture = true;
         } else {
@@ -252,7 +331,169 @@ c2_status_t C2FFMPEGVideoDecodeComponent::receiveFrame(bool* hasPicture) {
     return C2_OK;
 }
 
-c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuffer) {
+static C2Color::range_t toC2Range(enum AVColorRange r) {
+    switch (r) {
+        case AVCOL_RANGE_MPEG: return C2Color::RANGE_LIMITED;
+        case AVCOL_RANGE_JPEG: return C2Color::RANGE_FULL;
+        default:               return C2Color::RANGE_UNSPECIFIED;
+    }
+}
+
+static C2Color::primaries_t toC2Primaries(enum AVColorPrimaries p) {
+    switch (p) {
+        case AVCOL_PRI_BT709:     return C2Color::PRIMARIES_BT709;
+        case AVCOL_PRI_BT2020:    return C2Color::PRIMARIES_BT2020;
+        case AVCOL_PRI_BT470M:    return C2Color::PRIMARIES_BT470_M;
+        case AVCOL_PRI_BT470BG:   return C2Color::PRIMARIES_BT601_625;
+        case AVCOL_PRI_SMPTE170M:
+        case AVCOL_PRI_SMPTE240M: return C2Color::PRIMARIES_BT601_525;
+        default:                  return C2Color::PRIMARIES_UNSPECIFIED;
+    }
+}
+
+static C2Color::transfer_t toC2Transfer(enum AVColorTransferCharacteristic t) {
+    switch (t) {
+        case AVCOL_TRC_SMPTE2084:    return C2Color::TRANSFER_ST2084;
+        case AVCOL_TRC_ARIB_STD_B67: return C2Color::TRANSFER_HLG;
+        case AVCOL_TRC_BT709:
+        case AVCOL_TRC_SMPTE170M:
+        case AVCOL_TRC_BT2020_10:
+        case AVCOL_TRC_BT2020_12:    return C2Color::TRANSFER_170M;
+        case AVCOL_TRC_SMPTE240M:    return C2Color::TRANSFER_240M;
+        case AVCOL_TRC_LINEAR:       return C2Color::TRANSFER_LINEAR;
+        case AVCOL_TRC_IEC61966_2_1: return C2Color::TRANSFER_SRGB;
+        default:                     return C2Color::TRANSFER_UNSPECIFIED;
+    }
+}
+
+static C2Color::matrix_t toC2Matrix(enum AVColorSpace m) {
+    switch (m) {
+        case AVCOL_SPC_BT709:       return C2Color::MATRIX_BT709;
+        case AVCOL_SPC_BT2020_NCL:
+        case AVCOL_SPC_BT2020_CL:   return C2Color::MATRIX_BT2020;
+        case AVCOL_SPC_SMPTE240M:   return C2Color::MATRIX_240M;
+        case AVCOL_SPC_BT470BG:
+        case AVCOL_SPC_SMPTE170M:   return C2Color::MATRIX_BT601;
+        default:                    return C2Color::MATRIX_UNSPECIFIED;
+    }
+}
+
+// Colour aspects of the current frame: bitstream (VUI) values where
+// specified, container/client defaults (KEY_COLOR_*) otherwise - same rule as
+// AOSP C2SoftHevcDec's ColorAspectsSetter.
+C2ColorAspectsStruct C2FFMPEGVideoDecodeComponent::currentColorAspects() const {
+    const C2ColorAspectsStruct def = mIntf->getDefaultColorAspectsLocked();
+    C2ColorAspectsStruct a(toC2Range(mFrame->color_range), toC2Primaries(mFrame->color_primaries),
+                           toC2Transfer(mFrame->color_trc), toC2Matrix(mFrame->colorspace));
+    if (a.range == C2Color::RANGE_UNSPECIFIED) a.range = def.range;
+    if (a.primaries == C2Color::PRIMARIES_UNSPECIFIED) a.primaries = def.primaries;
+    if (a.transfer == C2Color::TRANSFER_UNSPECIFIED) a.transfer = def.transfer;
+    if (a.matrix == C2Color::MATRIX_UNSPECIFIED) a.matrix = def.matrix;
+    return a;
+}
+
+// Whether a 10-bit HEVC frame may be kept at 10 bits (P010) instead of being
+// truncated to 8 bits. Controlled by persist.vendor.ffmpeg_codec2.p010
+// (read in initOutputPolicy):
+//   "auto"   (default) only HDR (PQ / HLG) streams
+//   "always" every Main 10 stream
+//   "off"    never (previous behaviour)
+// and only when the client accepts a 10-bit format (Surface output =
+// IMPLEMENTATION_DEFINED, or an explicit P010 request, which always wins) and
+// gralloc can allocate P010.
+bool C2FFMPEGVideoDecodeComponent::allow10BitOutput() const {
+    if (!mIntf->isHevc() || !mFrame || mP010Mode == 0 || !mP010Supported) {
+        return false;
+    }
+    if (mClientPixelFormat == HAL_PIXEL_FORMAT_YCBCR_P010) {
+        return true;
+    }
+    if (mClientPixelFormat != HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED) {
+        return false;
+    }
+    if (mP010Mode == 2) {
+        return true;
+    }
+    const C2Color::transfer_t trc = currentColorAspects().transfer;
+    if (trc != C2Color::TRANSFER_ST2084 && trc != C2Color::TRANSFER_HLG) {
+        return false;
+    }
+    // 10-bit (P010) frames cannot be scanned out by the display hardware of the
+    // Raspberry Pi 4 and are composed by the GPU, which is too slow for 4K: keep the
+    // faster 8-bit path above this width (persist.vendor.ffmpeg_codec2.p010_max_width).
+    static const int maxWidth = base::GetIntProperty("persist.vendor.ffmpeg_codec2.p010_max_width", 2560);
+    return mFrame->width <= maxWidth;
+}
+
+// Report colour aspects and HDR static metadata of the current frame to the
+// framework (only when they changed), so a Surface consumer can pick the right
+// dataspace and the display can be switched to HDR.
+void C2FFMPEGVideoDecodeComponent::updateStreamInfo(
+        std::vector<std::unique_ptr<C2Param>>* configUpdate) {
+    if (!mIntf->isHevc()) {
+        return;
+    }
+
+    const C2ColorAspectsStruct cur = currentColorAspects();
+    C2StreamColorAspectsInfo::output aspects(0u, cur.range, cur.primaries, cur.transfer, cur.matrix);
+    if (!mColorAspectsSent ||
+            aspects.range != mLastAspects.range || aspects.primaries != mLastAspects.primaries ||
+            aspects.transfer != mLastAspects.transfer || aspects.matrix != mLastAspects.matrix) {
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        if (mIntf->config({ &aspects }, C2_MAY_BLOCK, &failures) == C2_OK) {
+            configUpdate->push_back(C2Param::Copy(aspects));
+            mLastAspects = aspects;
+            mColorAspectsSent = true;
+        } else {
+            ALOGW("updateStreamInfo: colour aspects config failed");
+        }
+    }
+
+    const AVFrameSideData* mdSd =
+            av_frame_get_side_data(mFrame, AV_FRAME_DATA_MASTERING_DISPLAY_METADATA);
+    const AVFrameSideData* cllSd =
+            av_frame_get_side_data(mFrame, AV_FRAME_DATA_CONTENT_LIGHT_LEVEL);
+    C2StreamHdrStaticInfo::output hdr(0u);
+    bool haveHdr = false;
+    if (mdSd) {
+        const AVMasteringDisplayMetadata* md = (const AVMasteringDisplayMetadata*)mdSd->data;
+        if (md->has_primaries) {
+            hdr.mastering.red   = { (float)av_q2d(md->display_primaries[0][0]),
+                                    (float)av_q2d(md->display_primaries[0][1]) };
+            hdr.mastering.green = { (float)av_q2d(md->display_primaries[1][0]),
+                                    (float)av_q2d(md->display_primaries[1][1]) };
+            hdr.mastering.blue  = { (float)av_q2d(md->display_primaries[2][0]),
+                                    (float)av_q2d(md->display_primaries[2][1]) };
+            hdr.mastering.white = { (float)av_q2d(md->white_point[0]),
+                                    (float)av_q2d(md->white_point[1]) };
+            haveHdr = true;
+        }
+        if (md->has_luminance) {
+            hdr.mastering.maxLuminance = (float)av_q2d(md->max_luminance);
+            hdr.mastering.minLuminance = (float)av_q2d(md->min_luminance);
+            haveHdr = true;
+        }
+    }
+    if (cllSd) {
+        const AVContentLightMetadata* cll = (const AVContentLightMetadata*)cllSd->data;
+        hdr.maxCll = (float)cll->MaxCLL;
+        hdr.maxFall = (float)cll->MaxFALL;
+        haveHdr = true;
+    }
+    if (haveHdr && (!mHdrSent || memcmp(&hdr.mastering, &mLastHdr.mastering, sizeof(hdr.mastering)) != 0 ||
+                    hdr.maxCll != mLastHdr.maxCll || hdr.maxFall != mLastHdr.maxFall)) {
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        if (mIntf->config({ &hdr }, C2_MAY_BLOCK, &failures) == C2_OK) {
+            configUpdate->push_back(C2Param::Copy(hdr));
+            mLastHdr = hdr;
+            mHdrSent = true;
+        } else {
+            ALOGW("updateStreamInfo: HDR static info config failed");
+        }
+    }
+}
+
+c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuffer, bool p010) {
     uint8_t* data[4];
     int linesize[4];
     C2PlanarLayout layout = outBuffer->layout();
@@ -265,13 +506,69 @@ c2_status_t C2FFMPEGVideoDecodeComponent::getOutputBuffer(C2GraphicView* outBuff
     linesize[1] = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
     linesize[2] = layout.planes[C2PlanarLayout::PLANE_V].rowInc;
 
+    if (mFrameIsHw) {
+        // NV12 layout: interleaved CbCr, V pointer one byte after U, 2 byte column step.
+        const bool nv12 = data[1] && data[2] && data[2] == data[1] + 1 &&
+                          layout.planes[C2PlanarLayout::PLANE_U].colInc == 2 &&
+                          layout.planes[C2PlanarLayout::PLANE_V].colInc == 2;
+        if (nv12) {
+            if (ffmpeg_hwaccel_nv12_into(mFrame, data[0], linesize[0], data[1], linesize[1],
+                                         mFrame->width, mFrame->height) == 0) {
+                return C2_OK;
+            }
+            ALOGE("getOutputBuffer: direct NV12 conversion failed, disabling it");
+            mDirectNv12 = false;
+            return C2_CORRUPTED;
+        }
+        // Not an NV12 buffer: use the CPU frame path (planar output buffer).
+        ALOGW("getOutputBuffer: output buffer is not NV12, using the copy path");
+        mDirectNv12 = false;
+        if (ffmpeg_hwaccel_get_frame(mCtx, mFrame, false) != 0) {
+            return C2_CORRUPTED;
+        }
+        mFrameIsHw = false;
+    }
+
+    // P010: Y plane + interleaved CbCr plane (data[1] = PLANE_U start, the V
+    // pointer is PLANE_U + 2 and is ignored by swscale), 10 bits MSB-aligned
+    // in 16. Everything else as 8-bit YV12 (PLANE_U/PLANE_V pointers take
+    // care of the YV12 Cr-before-Cb order).
+    // NOTE: the decision is passed in, not derived from mFrame->format: a
+    // software-decoded Main 10 frame is YUV420P10LE too and must still be
+    // converted to 8 bits when the client did not accept 10-bit output.
+    const AVPixelFormat dstFmt = p010 ? AV_PIX_FMT_P010LE : AV_PIX_FMT_YUV420P;
+
+    // Fast path for the common 8-bit case: NV12 from the HW decoder into the
+    // YV12 output buffer, multithreaded (swscale needs ~13 ms on one thread
+    // for a 4K frame).
+    if (!p010 && mFrame->format == AV_PIX_FMT_NV12 && data[1] && data[2] &&
+        ffmpeg_nv12_to_yuv420p(mFrame->data[0], mFrame->linesize[0],
+                               mFrame->data[1], mFrame->linesize[1],
+                               data[0], linesize[0], data[1], linesize[1], data[2], linesize[2],
+                               mFrame->width, mFrame->height, 4) == 0) {
+        return C2_OK;
+    }
+
+    // P010 to P010: a plain row copy. swscale is not needed (and was observed to
+    // corrupt chroma samples of 1080p frames).
+    if (p010 && mFrame->format == AV_PIX_FMT_P010LE && data[1] && mFrame->data[1]) {
+        const size_t rowBytes = (size_t)mFrame->width * 2;
+        for (int y = 0; y < mFrame->height; y++) {
+            memcpy(data[0] + (size_t)y * linesize[0], mFrame->data[0] + (size_t)y * mFrame->linesize[0], rowBytes);
+        }
+        for (int y = 0; y < (mFrame->height + 1) / 2; y++) {
+            memcpy(data[1] + (size_t)y * linesize[1], mFrame->data[1] + (size_t)y * mFrame->linesize[1], rowBytes);
+        }
+        return C2_OK;
+    }
+
     mImgConvertCtx = sws_getCachedContext(currentImgConvertCtx,
            mFrame->width, mFrame->height, (AVPixelFormat)mFrame->format,
-           mFrame->width, mFrame->height, AV_PIX_FMT_YUV420P,
+           mFrame->width, mFrame->height, dstFmt,
            SWS_BICUBIC, NULL, NULL, NULL);
     if (mImgConvertCtx && mImgConvertCtx != currentImgConvertCtx) {
         ALOGD("getOutputBuffer: created video converter - %s => %s",
-              av_get_pix_fmt_name((AVPixelFormat)mFrame->format), av_get_pix_fmt_name(AV_PIX_FMT_YUV420P));
+              av_get_pix_fmt_name((AVPixelFormat)mFrame->format), av_get_pix_fmt_name(dstFmt));
 
     } else if (! mImgConvertCtx) {
         ALOGE("getOutputBuffer: cannot initialize the conversion context");
@@ -304,7 +601,11 @@ static bool comparePendingWork(const PendingWork& w1, const PendingWork& w2) {
 void C2FFMPEGVideoDecodeComponent::pushPendingWork(const std::unique_ptr<C2Work>& work) {
     uint32_t outputDelay = mIntf->getOutputDelay();
 
-    if (mPendingWorkQueue.size() >= outputDelay) {
+    // A frame held by the output worker is still waiting for its work to be finished:
+    // it is one more legitimately pending work, not a work that never produces a frame.
+    const size_t pendingLimit = outputDelay + ((mAsyncOutput && mJobValid) ? 1u : 0u);
+
+    if (mPendingWorkQueue.size() >= pendingLimit) {
         uint32_t newOutputDelay = outputDelay;
         std::vector<std::unique_ptr<C2Param>> configUpdate;
 
@@ -419,6 +720,7 @@ void C2FFMPEGVideoDecodeComponent::onRelease() {
 
 c2_status_t C2FFMPEGVideoDecodeComponent::onFlush_sm() {
     ALOGD("onFlush_sm");
+    dropJob();
     if (mCtx && avcodec_is_open(mCtx)) {
         // Make sure that the next buffer output does not still
         // depend on fragments from the last one decoded.
@@ -457,16 +759,62 @@ c2_status_t C2FFMPEGVideoDecodeComponent::outputFrame(
         }
     }
 
-    std::shared_ptr<C2GraphicBlock> block;
+    // 10-bit output only if decided so in receiveFrame() AND the frame really
+    // is 10-bit (8-bit HW frames come out as YUV420P, Main 10 HW frames as
+    // P010LE or YUV420P10LE when mOutput10Bit, SW Main 10 frames always
+    // YUV420P10LE). P010LE -> P010LE is a plain line copy in swscale.
+    bool p010 = mOutput10Bit && (mFrame->format == AV_PIX_FMT_YUV420P10LE ||
+                                 mFrame->format == AV_PIX_FMT_P010LE);
 
-    err = pool->fetchGraphicBlock(mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12,
+    std::shared_ptr<C2GraphicBlock> block;
+    err = pool->fetchGraphicBlock(mFrame->width, mFrame->height,
+                                  p010 ? HAL_PIXEL_FORMAT_YCBCR_P010
+                                       : (mFrameIsHw ? HAL_PIXEL_FORMAT_YCBCR_420_888 : HAL_PIXEL_FORMAT_YV12),
                                   { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
+    if (err != C2_OK && mFrameIsHw) {
+        // Flexible buffer not available: use the copy path with plain YV12.
+        ALOGW("outputFrame: YCBCR_420_888 graphic block allocation failed (err = %d), using YV12", err);
+        mDirectNv12 = false;
+        if (ffmpeg_hwaccel_get_frame(mCtx, mFrame, false) != 0) {
+            return C2_CORRUPTED;
+        }
+        mFrameIsHw = false;
+        err = pool->fetchGraphicBlock(mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12,
+                                      { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
+    }
+    if (err != C2_OK && p010) {
+        // Do not abort playback: disable P010 for this instance and convert
+        // the (already 16-bit) frame down to 8 bits with swscale.
+        ALOGW("outputFrame: P010 graphic block allocation failed (err = %d), "
+              "falling back to 8-bit output", err);
+        mP010Supported = false;
+        p010 = false;
+        err = pool->fetchGraphicBlock(mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12,
+                                      { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE }, &block);
+    }
+    const uint32_t halFormat = p010 ? HAL_PIXEL_FORMAT_YCBCR_P010
+                                    : (mFrameIsHw ? HAL_PIXEL_FORMAT_YCBCR_420_888 : HAL_PIXEL_FORMAT_YV12);
 
     if (err != C2_OK) {
         ALOGE("outputFrame: failed to fetch graphic block %d x %d (%x) err = %d",
-              mFrame->width, mFrame->height, HAL_PIXEL_FORMAT_YV12, err);
+              mFrame->width, mFrame->height, halFormat, err);
         return C2_CORRUPTED;
     }
+
+    if (halFormat != mHalPixelFormat) {
+        // Tell the framework the buffers are now (or no longer) 10-bit.
+        C2StreamPixelFormatInfo::output pixelFormat(0u, halFormat);
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        err = mIntf->config({ &pixelFormat }, C2_MAY_BLOCK, &failures);
+        if (err != C2_OK) {
+            ALOGE("outputFrame: pixel format config update to %x failed err = %d", halFormat, err);
+            return C2_CORRUPTED;
+        }
+        configUpdate.push_back(C2Param::Copy(pixelFormat));
+        mHalPixelFormat = halFormat;
+    }
+
+    updateStreamInfo(&configUpdate);
 
     C2GraphicView wView = block->map().get();
 
@@ -476,11 +824,52 @@ c2_status_t C2FFMPEGVideoDecodeComponent::outputFrame(
         return C2_CORRUPTED;
     }
 
-    err = getOutputBuffer(&wView);
+    if (mAsyncOutput && mFrameIsHw && !p010) {
+        C2PlanarLayout lay = wView.layout();
+        uint8_t* dy = wView.data()[C2PlanarLayout::PLANE_Y];
+        uint8_t* du = wView.data()[C2PlanarLayout::PLANE_U];
+        uint8_t* dv = wView.data()[C2PlanarLayout::PLANE_V];
+        const bool nv12 = du && dv && dv == du + 1 &&
+                          lay.planes[C2PlanarLayout::PLANE_U].colInc == 2 &&
+                          lay.planes[C2PlanarLayout::PLANE_V].colInc == 2;
+        if (nv12) {
+            // Deliver the previous frame first (keeps the output order), then hand
+            // this one to the worker.
+            err = completeJob();
+            if (err != C2_OK) {
+                return err;
+            }
+            OutputJob& job = mJob;
+            job.hw = av_frame_clone(mFrame);
+            if (!job.hw) {
+                return C2_NO_MEMORY;
+            }
+            job.view.reset(new C2GraphicView(wView));
+            job.block = std::move(block);
+            job.halFormat = halFormat;
+            job.configUpdate = std::move(configUpdate);
+            job.frameIndex = (uint64_t)mFrame->best_effort_timestamp;
+            job.width = mFrame->width;
+            job.height = mFrame->height;
+            job.dstY = dy;
+            job.strideY = lay.planes[C2PlanarLayout::PLANE_Y].rowInc;
+            job.dstC = du;
+            job.strideC = lay.planes[C2PlanarLayout::PLANE_U].rowInc;
+            job.result = 0;
+            submitJob();
+            return C2_OK;
+        }
+    }
+
+    err = getOutputBuffer(&wView, p010);
     if (err == C2_OK) {
         std::shared_ptr<C2Buffer> buffer = createGraphicBuffer(std::move(block), C2Rect(mFrame->width, mFrame->height));
 
-        buffer->setInfo(mIntf->getPixelFormatInfo());
+        // Attach the format of *this* buffer (an immutable snapshot) instead
+        // of the live interface parameter, which may differ (e.g. still
+        // IMPLEMENTATION_DEFINED as configured by the client) and is
+        // replaced under the interface lock by other threads.
+        buffer->setInfo(std::make_shared<C2StreamPixelFormatInfo::output>(0u, halFormat));
 
         if (work && c2_cntr64_t(mFrame->best_effort_timestamp) == work->input.ordinal.frameIndex) {
             prunePendingWorksUntil(work);
@@ -643,6 +1032,7 @@ void C2FFMPEGVideoDecodeComponent::process(
 #endif
 
     if (eos) {
+        completeJob();
         mEOSSignalled = true;
         work->worklets.front()->output.flags = C2FrameData::FLAG_END_OF_STREAM;
         work->workletsProcessed = 1u;
@@ -692,7 +1082,101 @@ c2_status_t C2FFMPEGVideoDecodeComponent::drain(
         }
     }
 
+    completeJob();
+
     return C2_OK;
+}
+
+void C2FFMPEGVideoDecodeComponent::workerLoop() {
+    // The conversion is memory bandwidth bound and, with four threads, saturates the
+    // CPU: audio and UI threads (normal priority) then miss their deadlines. Run the
+    // worker, and the helper threads it creates (they inherit the priority), niced.
+    setpriority(PRIO_PROCESS, gettid(), base::GetIntProperty("persist.vendor.ffmpeg_codec2.worker_nice", 10));
+    std::unique_lock<std::mutex> lk(mJobMutex);
+    for (;;) {
+        mJobCv.wait(lk, [this] { return mJobRun || mWorkerExit; });
+        if (mWorkerExit) {
+            return;
+        }
+        OutputJob& job = mJob;
+        lk.unlock();
+        ffmpeg_hwaccel_set_threads(base::GetIntProperty("persist.vendor.ffmpeg_codec2.sand_threads", 4));
+        const int r = ffmpeg_hwaccel_nv12_into(job.hw, job.dstY, job.strideY, job.dstC, job.strideC,
+                                               job.width, job.height);
+        lk.lock();
+        job.result = r;
+        mJobRun = false;
+        mJobDone = true;
+        mJobCv.notify_all();
+    }
+}
+
+void C2FFMPEGVideoDecodeComponent::submitJob() {
+    std::lock_guard<std::mutex> lk(mJobMutex);
+    if (!mWorker.joinable()) {
+        mWorker = std::thread([this] { workerLoop(); });
+    }
+    mJobValid = true;
+    mJobRun = true;
+    mJobDone = false;
+    mJobCv.notify_all();
+}
+
+c2_status_t C2FFMPEGVideoDecodeComponent::completeJob() {
+    std::unique_lock<std::mutex> lk(mJobMutex);
+    if (!mJobValid) {
+        return C2_OK;
+    }
+    mJobCv.wait(lk, [this] { return mJobDone; });
+    mJobValid = false;
+    mJobDone = false;
+    OutputJob job = std::move(mJob);
+    mJob = OutputJob();
+    lk.unlock();
+
+    av_frame_free(&job.hw);
+
+    if (job.result != 0) {
+        ALOGE("completeJob: conversion failed (%d), dropping the frame", job.result);
+        mDirectNv12 = false;
+        finish(job.frameIndex, [this](const std::unique_ptr<C2Work>& work) {
+            popPendingWork(work);
+            fillEmptyWork(work);
+        });
+        return C2_OK;
+    }
+
+    std::shared_ptr<C2Buffer> buffer =
+        createGraphicBuffer(std::move(job.block), C2Rect(job.width, job.height));
+    buffer->setInfo(std::make_shared<C2StreamPixelFormatInfo::output>(0u, job.halFormat));
+    job.view.reset();
+
+    auto fillWork = [&buffer, &job, this](const std::unique_ptr<C2Work>& work) {
+        popPendingWork(work);
+        work->worklets.front()->output.configUpdate = std::move(job.configUpdate);
+        work->worklets.front()->output.flags = (C2FrameData::flags_t)0;
+        work->worklets.front()->output.buffers.clear();
+        work->worklets.front()->output.buffers.push_back(buffer);
+        work->worklets.front()->output.ordinal = work->input.ordinal;
+        work->workletsProcessed = 1u;
+        work->result = C2_OK;
+    };
+    finish(job.frameIndex, fillWork);
+    return C2_OK;
+}
+
+void C2FFMPEGVideoDecodeComponent::dropJob() {
+    std::unique_lock<std::mutex> lk(mJobMutex);
+    if (!mJobValid) {
+        return;
+    }
+    mJobCv.wait(lk, [this] { return mJobDone; });
+    mJobValid = false;
+    mJobDone = false;
+    OutputJob job = std::move(mJob);
+    mJob = OutputJob();
+    lk.unlock();
+    av_frame_free(&job.hw);
 }
 
 } // namespace android

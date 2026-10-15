@@ -34,8 +34,43 @@ public:
     const std::shared_ptr<C2StreamPixelFormatInfo::output>&
         getPixelFormatInfo() const { return mPixelFormat; }
     uint32_t getOutputDelay() const { return mActualOutputDelay->value; }
+    bool isHevc() const { return mIsHevc; }
+
+    // Thread-safe accessors for parameters that the client may (re)configure
+    // from a binder thread while the component thread reads them.
+    std::shared_ptr<C2StreamPixelFormatInfo::output> getPixelFormatInfoLocked() const {
+        Lock lock = this->lock();
+        return mPixelFormat;
+    }
+    uint32_t getPixelFormatLocked() const {
+        Lock lock = this->lock();
+        return mPixelFormat->value;
+    }
+    // Container / client supplied colour aspects (C2_PARAMKEY_DEFAULT_COLOR_ASPECTS),
+    // only declared for HEVC. Returns all-unspecified otherwise.
+    C2ColorAspectsStruct getDefaultColorAspectsLocked() const {
+        Lock lock = this->lock();
+        if (!mDefaultColorAspects) {
+            return C2ColorAspectsStruct();
+        }
+        return C2ColorAspectsStruct(mDefaultColorAspects->range, mDefaultColorAspects->primaries,
+                                    mDefaultColorAspects->transfer, mDefaultColorAspects->matrix);
+    }
 
 private:
+    static C2R PixelFormatSetter(
+        bool mayBlock,
+        const C2P<C2StreamPixelFormatInfo::output> &oldMe,
+        C2P<C2StreamPixelFormatInfo::output> &me);
+    static C2R DefaultColorAspectsSetter(
+        bool mayBlock,
+        C2P<C2StreamColorAspectsTuning::output> &me);
+    static C2R ColorAspectsSetter(
+        bool mayBlock,
+        C2P<C2StreamColorAspectsInfo::output> &me);
+    static C2R HdrStaticInfoSetter(
+        bool mayBlock,
+        C2P<C2StreamHdrStaticInfo::output> &me);
     static C2R SizeSetter(
         bool mayBlock,
         const C2P<C2StreamPictureSizeInfo::output> &oldMe,
@@ -51,6 +86,10 @@ private:
     std::shared_ptr<C2StreamColorInfo::output> mColorInfo;
     std::shared_ptr<C2StreamPixelFormatInfo::output> mPixelFormat;
     std::shared_ptr<C2StreamUsageTuning::output> mConsumerUsage;
+    std::shared_ptr<C2StreamColorAspectsTuning::output> mDefaultColorAspects;
+    std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
+    std::shared_ptr<C2StreamHdrStaticInfo::output> mHdrStaticInfo;
+    bool mIsHevc;
 };
 
 } // namespace android
